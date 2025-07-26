@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ゆらぎのグラフ</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #f5f5a0;
+            border-radius: 30px;
+            padding: 15px 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .canvas-container {
+            position: relative;
+            background-color: #f8f8f8;
+            border-radius: 20px;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+            background-color: white;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .color-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 5px;
+            border: 3px solid transparent;
+        }
+        .color-btn.active {
+            border-color: #333;
+        }
+        .black-btn {
+            background-color: #333;
+        }
+        .pink-btn {
+            background-color: #ff6b9d;
+        }
+        .clear-btn {
+            background-color: #ff4444;
+            color: white;
+        }
+        .legend {
+            margin: 20px;
+            text-align: center;
+        }
+        .legend-item {
+            display: inline-block;
+            margin: 0 20px;
+        }
+        .legend-line {
+            display: inline-block;
+            width: 30px;
+            height: 3px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        .axis-labels {
+            position: absolute;
+            font-size: 20px;
+            color: #666;
+        }
+        .m-label {
+            left: 40px;
+            top: 40px;
+        }
+        .f-label {
+            right: 40px;
+            top: 40px;
+        }
+        .y-labels {
+            position: absolute;
+            left: 10px;
+            font-size: 18px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">ゆらぎのグラフ</div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-line" style="background-color: #333;"></span>
+                <span>振る舞ってきた性</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-line" style="background-color: #ff6b9d;"></span>
+                <span>性自認</span>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="axis-labels m-label">M</div>
+            <div class="axis-labels f-label">F</div>
+            <canvas id="drawingCanvas" width="700" height="500"></canvas>
+            <div class="y-labels" style="top: 80px;">1</div>
+            <div class="y-labels" style="top: 180px;">2</div>
+            <div class="y-labels" style="top: 280px;">3</div>
+            <div class="y-labels" style="top: 380px;">4</div>
+            <div class="y-labels" style="bottom: 40px; left: 340px;">現在</div>
+        </div>
+        
+        <div class="controls">
+            <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
+            <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')"></button>
+            <button class="clear-btn" onclick="clearCanvas()">クリア</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let currentColor = '#333333';
+        let lastX = 0;
+        let lastY = 0;
+
+        // Draw the center line
+        function drawCenterLine() {
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+        }
+
+        // Initialize canvas
+        drawCenterLine();
+
+        // Set drawing color
+        function setColor(color) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Clear canvas
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawCenterLine();
+        }
+
+        // Drawing functions
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+            
+            lastX = currentX;
+            lastY = currentY;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+
+        // Touch support for mobile devices
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+            isDrawing = true;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const currentX = touch.clientX - rect.left;
+            const currentY = touch.clientY - rect.top;
+            
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+            
+            lastX = currentX;
+            lastY = currentY;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+        });
+    </script>
+</body>
+</html>
