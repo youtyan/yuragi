@@ -7,7 +7,7 @@
     <style>
         body {
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
             display: flex;
@@ -17,6 +17,8 @@
         }
         .main-container {
             text-align: center;
+            width: 100%;
+            max-width: 860px;
         }
         canvas {
             border-radius: 20px;
@@ -24,6 +26,9 @@
             cursor: crosshair;
             display: block;
             margin: 0 auto;
+            width: 100%;
+            height: auto;
+            max-width: 840px;
         }
         .controls {
             margin-top: 20px;
@@ -31,7 +36,7 @@
         }
         button {
             padding: 10px 20px;
-            margin: 0 10px;
+            margin: 5px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
@@ -61,11 +66,24 @@
             background-color: #4CAF50;
             color: white;
         }
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            button {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            .color-btn {
+                width: 35px;
+                height: 35px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="main-container">
-        <canvas id="drawingCanvas" width="840" height="700"></canvas>
+        <canvas id="drawingCanvas"></canvas>
         
         <div class="controls">
             <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
@@ -82,8 +100,36 @@
         let currentColor = '#333333';
         let lastX = 0;
         let lastY = 0;
+        let scale = 1;
         
-        // Drawing area boundaries
+        // Set canvas size based on viewport
+        function setCanvasSize() {
+            const containerWidth = canvas.parentElement.offsetWidth;
+            const maxWidth = 840;
+            const maxHeight = 700;
+            
+            if (containerWidth < maxWidth) {
+                scale = containerWidth / maxWidth;
+                canvas.width = containerWidth;
+                canvas.height = maxHeight * scale;
+            } else {
+                scale = 1;
+                canvas.width = maxWidth;
+                canvas.height = maxHeight;
+            }
+            
+            // Set canvas actual size for high DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            canvas.style.width = canvas.width + 'px';
+            canvas.style.height = canvas.height + 'px';
+            canvas.width *= dpr;
+            canvas.height *= dpr;
+            ctx.scale(dpr * scale, dpr * scale);
+            
+            drawStaticElements();
+        }
+        
+        // Drawing area boundaries (original size)
         const drawingArea = {
             x: 70,
             y: 200,
@@ -109,11 +155,11 @@
         // Draw the static elements
         function drawStaticElements() {
             // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, 840, 700);
             
             // Fill light purple background
             ctx.fillStyle = '#f5f0f8';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, 840, 700);
             
             // Draw main container with border
             ctx.strokeStyle = '#333';
@@ -205,7 +251,8 @@
         }
 
         // Initialize canvas
-        drawStaticElements();
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
 
         // Set drawing color
         function setColor(color) {
@@ -223,11 +270,24 @@
 
         // Save canvas as image
         function saveCanvas() {
-            const link = document.createElement('a');
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
-            link.download = `yuragi_graph_${timestamp}.png`;
-            link.href = canvas.toDataURL();
-            link.click();
+            // Create a temporary canvas at original size
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = 840;
+            tempCanvas.height = 700;
+            
+            // Get the current canvas content and draw it at original size
+            const imgData = canvas.toDataURL();
+            const img = new Image();
+            img.onload = function() {
+                tempCtx.drawImage(img, 0, 0, 840, 700);
+                const link = document.createElement('a');
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
+                link.download = `yuragi_graph_${timestamp}.png`;
+                link.href = tempCanvas.toDataURL();
+                link.click();
+            };
+            img.src = imgData;
         }
 
         // Check if point is within drawing area
@@ -238,16 +298,24 @@
                    y <= drawingArea.y + drawingArea.height;
         }
 
+        // Get coordinates adjusted for scale
+        function getCoordinates(e, rect) {
+            const dpr = window.devicePixelRatio || 1;
+            return {
+                x: (e.clientX - rect.left) / scale,
+                y: (e.clientY - rect.top) / scale
+            };
+        }
+
         // Drawing functions
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const coords = getCoordinates(e, rect);
             
-            if (isInDrawingArea(x, y)) {
+            if (isInDrawingArea(coords.x, coords.y)) {
                 isDrawing = true;
-                lastX = x;
-                lastY = y;
+                lastX = coords.x;
+                lastY = coords.y;
             }
         });
 
@@ -255,11 +323,10 @@
             if (!isDrawing) return;
             
             const rect = canvas.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
+            const coords = getCoordinates(e, rect);
             
             // Only draw if within drawing area
-            if (isInDrawingArea(currentX, currentY)) {
+            if (isInDrawingArea(coords.x, coords.y)) {
                 ctx.strokeStyle = currentColor;
                 ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
@@ -267,11 +334,11 @@
                 
                 ctx.beginPath();
                 ctx.moveTo(lastX, lastY);
-                ctx.lineTo(currentX, currentY);
+                ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
                 
-                lastX = currentX;
-                lastY = currentY;
+                lastX = coords.x;
+                lastY = coords.y;
             } else {
                 isDrawing = false;
             }
@@ -290,12 +357,14 @@
             e.preventDefault();
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
+            const coords = {
+                x: (touch.clientX - rect.left) / scale,
+                y: (touch.clientY - rect.top) / scale
+            };
             
-            if (isInDrawingArea(x, y)) {
-                lastX = x;
-                lastY = y;
+            if (isInDrawingArea(coords.x, coords.y)) {
+                lastX = coords.x;
+                lastY = coords.y;
                 isDrawing = true;
             }
         });
@@ -306,10 +375,12 @@
             
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
-            const currentX = touch.clientX - rect.left;
-            const currentY = touch.clientY - rect.top;
+            const coords = {
+                x: (touch.clientX - rect.left) / scale,
+                y: (touch.clientY - rect.top) / scale
+            };
             
-            if (isInDrawingArea(currentX, currentY)) {
+            if (isInDrawingArea(coords.x, coords.y)) {
                 ctx.strokeStyle = currentColor;
                 ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
@@ -317,11 +388,11 @@
                 
                 ctx.beginPath();
                 ctx.moveTo(lastX, lastY);
-                ctx.lineTo(currentX, currentY);
+                ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
                 
-                lastX = currentX;
-                lastY = currentY;
+                lastX = coords.x;
+                lastY = coords.y;
             } else {
                 isDrawing = false;
             }
