@@ -10,36 +10,20 @@
             padding: 20px;
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background-color: #f5f5a0;
-            border-radius: 30px;
-            padding: 15px 30px;
+        .main-container {
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .canvas-container {
-            position: relative;
-            background-color: #f8f8f8;
-            border-radius: 20px;
-            padding: 20px;
         }
         canvas {
-            border: 1px solid #ddd;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             cursor: crosshair;
             display: block;
             margin: 0 auto;
-            background-color: white;
         }
         .controls {
             margin-top: 20px;
@@ -73,72 +57,21 @@
             background-color: #ff4444;
             color: white;
         }
-        .legend {
-            margin: 20px;
-            text-align: center;
-        }
-        .legend-item {
-            display: inline-block;
-            margin: 0 20px;
-        }
-        .legend-line {
-            display: inline-block;
-            width: 30px;
-            height: 3px;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-        .axis-labels {
-            position: absolute;
-            font-size: 20px;
-            color: #666;
-        }
-        .m-label {
-            left: 40px;
-            top: 40px;
-        }
-        .f-label {
-            right: 40px;
-            top: 40px;
-        }
-        .y-labels {
-            position: absolute;
-            left: 10px;
-            font-size: 18px;
-            color: #666;
+        .save-btn {
+            background-color: #4CAF50;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">ゆらぎのグラフ</div>
-        
-        <div class="legend">
-            <div class="legend-item">
-                <span class="legend-line" style="background-color: #333;"></span>
-                <span>振る舞ってきた性</span>
-            </div>
-            <div class="legend-item">
-                <span class="legend-line" style="background-color: #ff6b9d;"></span>
-                <span>性自認</span>
-            </div>
-        </div>
-        
-        <div class="canvas-container">
-            <div class="axis-labels m-label">M</div>
-            <div class="axis-labels f-label">F</div>
-            <canvas id="drawingCanvas" width="700" height="500"></canvas>
-            <div class="y-labels" style="top: 80px;">1</div>
-            <div class="y-labels" style="top: 180px;">2</div>
-            <div class="y-labels" style="top: 280px;">3</div>
-            <div class="y-labels" style="top: 380px;">4</div>
-            <div class="y-labels" style="bottom: 40px; left: 340px;">現在</div>
-        </div>
+    <div class="main-container">
+        <canvas id="drawingCanvas" width="840" height="700"></canvas>
         
         <div class="controls">
             <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
             <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')"></button>
             <button class="clear-btn" onclick="clearCanvas()">クリア</button>
+            <button class="save-btn" onclick="saveCanvas()">画像を保存</button>
         </div>
     </div>
 
@@ -149,19 +82,104 @@
         let currentColor = '#333333';
         let lastX = 0;
         let lastY = 0;
+        
+        // Drawing area boundaries
+        const drawingArea = {
+            x: 70,
+            y: 160,
+            width: 700,
+            height: 500
+        };
 
-        // Draw the center line
-        function drawCenterLine() {
+        // Helper function to draw rounded rectangle
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        // Draw the static elements
+        function drawStaticElements() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Fill white background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw main container background
+            ctx.fillStyle = '#f8f8f8';
+            roundRect(ctx, 20, 100, 800, 560, 20);
+            ctx.fill();
+            
+            // Draw header
+            ctx.fillStyle = '#f5f5a0';
+            roundRect(ctx, 200, 20, 440, 60, 30);
+            ctx.fill();
+            
+            // Add title
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'center';
+            ctx.fillText('ゆらぎのグラフ', 420, 55);
+            
+            // Add legend
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            
+            // Black line legend
+            ctx.fillStyle = '#333';
+            ctx.fillRect(250, 110, 30, 3);
+            ctx.fillText('振る舞ってきた性', 290, 115);
+            
+            // Pink line legend
+            ctx.fillStyle = '#ff6b9d';
+            ctx.fillRect(450, 110, 30, 3);
+            ctx.fillText('性自認', 490, 115);
+            
+            // Draw white drawing area
+            ctx.fillStyle = 'white';
+            ctx.fillRect(drawingArea.x, drawingArea.y, drawingArea.width, drawingArea.height);
+            
+            // Draw center line
             ctx.strokeStyle = '#ccc';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 0);
-            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.moveTo(drawingArea.x + drawingArea.width / 2, drawingArea.y);
+            ctx.lineTo(drawingArea.x + drawingArea.width / 2, drawingArea.y + drawingArea.height);
             ctx.stroke();
+            
+            // Add axis labels
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'left';
+            ctx.fillText('M', 40, 180);
+            ctx.textAlign = 'right';
+            ctx.fillText('F', 800, 180);
+            
+            // Add Y-axis labels
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText('1', 60, 240);
+            ctx.fillText('2', 60, 340);
+            ctx.fillText('3', 60, 440);
+            ctx.fillText('4', 60, 540);
+            
+            // Add "現在" label
+            ctx.textAlign = 'center';
+            ctx.fillText('現在', 420, 640);
         }
 
         // Initialize canvas
-        drawCenterLine();
+        drawStaticElements();
 
         // Set drawing color
         function setColor(color) {
@@ -174,16 +192,37 @@
 
         // Clear canvas
         function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawCenterLine();
+            drawStaticElements();
+        }
+
+        // Save canvas as image
+        function saveCanvas() {
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
+            link.download = `yuragi_graph_${timestamp}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Check if point is within drawing area
+        function isInDrawingArea(x, y) {
+            return x >= drawingArea.x && 
+                   x <= drawingArea.x + drawingArea.width && 
+                   y >= drawingArea.y && 
+                   y <= drawingArea.y + drawingArea.height;
         }
 
         // Drawing functions
         canvas.addEventListener('mousedown', (e) => {
-            isDrawing = true;
             const rect = canvas.getBoundingClientRect();
-            lastX = e.clientX - rect.left;
-            lastY = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (isInDrawingArea(x, y)) {
+                isDrawing = true;
+                lastX = x;
+                lastY = y;
+            }
         });
 
         canvas.addEventListener('mousemove', (e) => {
@@ -193,18 +232,23 @@
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
             
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-            
-            lastX = currentX;
-            lastY = currentY;
+            // Only draw if within drawing area
+            if (isInDrawingArea(currentX, currentY)) {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(currentX, currentY);
+                ctx.stroke();
+                
+                lastX = currentX;
+                lastY = currentY;
+            } else {
+                isDrawing = false;
+            }
         });
 
         canvas.addEventListener('mouseup', () => {
@@ -220,9 +264,14 @@
             e.preventDefault();
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
-            lastX = touch.clientX - rect.left;
-            lastY = touch.clientY - rect.top;
-            isDrawing = true;
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            if (isInDrawingArea(x, y)) {
+                lastX = x;
+                lastY = y;
+                isDrawing = true;
+            }
         });
 
         canvas.addEventListener('touchmove', (e) => {
@@ -234,18 +283,22 @@
             const currentX = touch.clientX - rect.left;
             const currentY = touch.clientY - rect.top;
             
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-            
-            lastX = currentX;
-            lastY = currentY;
+            if (isInDrawingArea(currentX, currentY)) {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(currentX, currentY);
+                ctx.stroke();
+                
+                lastX = currentX;
+                lastY = currentY;
+            } else {
+                isDrawing = false;
+            }
         });
 
         canvas.addEventListener('touchend', () => {
