@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ゆらぎのグラフ</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             margin: 0;
             padding: 10px;
@@ -12,33 +15,35 @@
             background-color: #f0f0f0;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
+            overflow-x: hidden;
         }
         .main-container {
             text-align: center;
             width: 100%;
-            max-width: 1060px;
+            max-width: 1440px;
+            box-sizing: border-box;
         }
         .canvas-container {
             position: relative;
-            display: inline-block;
-            margin: 0 auto;
-        }
-        #backgroundImage {
             display: block;
+            margin: 0 auto;
             width: 100%;
-            height: auto;
-            max-width: 1040px;
-            border-radius: 20px;
+            max-width: 1400px;
+            box-sizing: border-box;
         }
         #drawingCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
+            display: none; /* 初期状態では非表示 */
             width: 100%;
-            height: 100%;
+            height: auto;
+            border-radius: 20px;
             cursor: crosshair;
+            background: white;
+            box-sizing: border-box;
+        }
+        #drawingCanvas.loaded {
+            display: block;
         }
         #drawingCanvas.select-mode {
             cursor: pointer;
@@ -48,11 +53,14 @@
         }
         .controls {
             margin-top: 20px;
-            display: flex;
+            display: none; /* 初期状態では非表示 */
             flex-wrap: wrap;
             justify-content: center;
             gap: 20px;
             padding: 0 10px;
+        }
+        .controls.show {
+            display: flex;
         }
         .control-group {
             background: white;
@@ -197,28 +205,102 @@
         .help-text.show {
             display: block;
         }
+        .image-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border-radius: 20px;
+        }
+        .image-loader.hidden {
+            display: none;
+        }
+        .image-loader h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .image-loader p {
+            margin: 0 0 20px 0;
+            color: #666;
+        }
+        .drop-zone {
+            width: 300px;
+            height: 200px;
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            background: #f9f9f9;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: #2196F3;
+            background: #e3f2fd;
+        }
+        #fileInput {
+            padding: 10px;
+            font-size: 16px;
+        }
+        @media (max-width: 480px) {
+            #drawingCanvas {
+                border-radius: 10px;
+            }
+            .control-group {
+                flex: 1 1 100%;
+            }
+            button {
+                min-width: 100px;
+                font-size: 11px;
+                padding: 6px 10px;
+            }
+            button .icon {
+                font-size: 14px;
+            }
+        }
+        
         @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
             .controls {
                 gap: 10px;
+                padding: 0 5px;
             }
             .control-group {
                 min-width: 100%;
                 padding: 10px;
             }
+            .control-group h3 {
+                font-size: 12px;
+                margin-bottom: 8px;
+            }
             .tool-buttons {
                 flex-direction: row;
                 flex-wrap: wrap;
                 justify-content: center;
+                gap: 5px;
             }
             .color-selector {
                 flex-direction: row;
                 justify-content: center;
+                gap: 10px;
             }
             button {
                 padding: 8px 12px;
                 font-size: 12px;
                 flex: 1;
-                min-width: 120px;
+                min-width: 110px;
             }
             button .icon {
                 font-size: 16px;
@@ -228,6 +310,16 @@
                 right: 10px;
                 font-size: 12px;
                 padding: 8px 15px;
+            }
+            .drop-zone {
+                width: 250px;
+                height: 150px;
+            }
+            .image-loader h2 {
+                font-size: 18px;
+            }
+            .image-loader p {
+                font-size: 14px;
             }
         }
     </style>
@@ -239,9 +331,16 @@
     </div>
     <div class="main-container">
         <div class="canvas-container">
-            <img id="backgroundImage" src="Graph.png" alt="ゆらぎのグラフ">
             <canvas id="drawingCanvas"></canvas>
             <div class="help-text" id="helpText"></div>
+            <div class="image-loader" id="imageLoader">
+                <h2>画像を選択してください</h2>
+                <p>Graph.png を選択するか、ドラッグ＆ドロップしてください</p>
+                <input type="file" id="fileInput" accept="image/*">
+                <div class="drop-zone" id="dropZone">
+                    ここに画像をドロップ
+                </div>
+            </div>
         </div>
         
         <div class="controls">
@@ -300,7 +399,8 @@
     <script>
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
-        const backgroundImage = document.getElementById('backgroundImage');
+        let backgroundImage = new Image();
+        let imageLoaded = false;
         let isDrawing = false;
         let currentColor = '#333333';
         let lastX = 0;
@@ -312,6 +412,7 @@
         let eraseMode = false;  // 消しゴムモード
         let selectMode = false;  // 選択モード
         let selectedStrokes = [];  // 選択された線のインデックス
+        let currentCanvasWidth = 0;  // 現在のキャンバス幅を記録
         
         // Drawing area boundaries (relative to image size)
         const drawingAreaRatio = {
@@ -323,38 +424,138 @@
         
         // Set canvas size based on image
         function setCanvasSize() {
-            const rect = backgroundImage.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
+            if (!imageLoaded) {
+                // 画像が読み込まれていない場合は何もしない
+                return;
+            }
+            
+            // Get container width (with padding consideration)
+            const containerWidth = canvas.parentElement.offsetWidth - 20; // 20px for padding
+            const maxWidth = Math.min(containerWidth, 1400);
+            
+            // Calculate height based on image aspect ratio
+            const aspectRatio = backgroundImage.naturalHeight / backgroundImage.naturalWidth;
+            const width = maxWidth;
+            const height = width * aspectRatio;
+            
+            // If canvas size changed, scale the strokes
+            if (currentCanvasWidth > 0 && currentCanvasWidth !== width) {
+                const scaleRatio = width / currentCanvasWidth;
+                allStrokes = allStrokes.map(stroke => ({
+                    ...stroke,
+                    points: stroke.points.map(point => ({
+                        x: point.x * scaleRatio,
+                        y: point.y * scaleRatio
+                    }))
+                }));
+            }
+            
+            currentCanvasWidth = width;
+            
+            // Set canvas display size
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
             
             // Adjust for high DPI displays
             const dpr = window.devicePixelRatio || 1;
-            canvas.width *= dpr;
-            canvas.height *= dpr;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            
+            // Reset context and scale
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.scale(dpr, dpr);
+            
+            // Draw background image
+            drawBackground();
         }
         
-        // Initialize canvas when image loads
-        backgroundImage.onload = function() {
-            setCanvasSize();
-            // デバッグ用: 描画エリアの境界を表示
-            if (window.location.hash === '#debug') {
-                showDrawingArea();
+        // Draw background image
+        function drawBackground() {
+            if (backgroundImage.complete && imageLoaded) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const width = canvas.width / (window.devicePixelRatio || 1);
+                const height = canvas.height / (window.devicePixelRatio || 1);
+                
+                ctx.drawImage(backgroundImage, 0, 0, width, height);
+                
+                // Redraw all strokes
+                redrawAllStrokes();
             }
-            // Initialize UI state
-            updateModeIndicator();
-        };
+        }
+        
+        // Initialize file input handlers
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const imageLoader = document.getElementById('imageLoader');
+        
+        // File input change handler
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drop zone handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', handleDragOver);
+        dropZone.addEventListener('dragleave', handleDragLeave);
+        dropZone.addEventListener('drop', handleDrop);
+        
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImageFile(file);
+            }
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        }
+        
+        function handleDragLeave(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImageFile(file);
+            }
+        }
+        
+        function loadImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                backgroundImage.onload = function() {
+                    imageLoaded = true;
+                    imageLoader.classList.add('hidden');
+                    canvas.classList.add('loaded');
+                    document.querySelector('.controls').classList.add('show');
+                    currentCanvasWidth = 0; // Reset canvas width tracking
+                    setCanvasSize();
+                    // デバッグ用: 描画エリアの境界を表示
+                    if (window.location.hash === '#debug') {
+                        showDrawingArea();
+                    }
+                    // Initialize UI state
+                    updateModeIndicator();
+                };
+                backgroundImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
         
         // デバッグ用: 描画エリアを可視化
         function showDrawingArea() {
-            const rect = backgroundImage.getBoundingClientRect();
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
             const drawingArea = {
-                x: rect.width * drawingAreaRatio.x,
-                y: rect.height * drawingAreaRatio.y,
-                width: rect.width * drawingAreaRatio.width,
-                height: rect.height * drawingAreaRatio.height
+                x: width * drawingAreaRatio.x,
+                y: height * drawingAreaRatio.y,
+                width: width * drawingAreaRatio.width,
+                height: height * drawingAreaRatio.height
             };
             
             ctx.strokeStyle = 'red';
@@ -363,8 +564,12 @@
         }
         
         // Resize canvas when window resizes
+        let resizeTimer;
         window.addEventListener('resize', () => {
-            setCanvasSize();
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                setCanvasSize();
+            }, 250);
         });
 
         // Update mode indicator
@@ -422,9 +627,11 @@
 
         // Clear canvas
         function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            allStrokes = [];
-            selectedStrokes = [];
+            if (confirm('すべての線を消去しますか？')) {
+                allStrokes = [];
+                selectedStrokes = [];
+                drawBackground();
+            }
         }
         
         // Toggle select mode
@@ -447,7 +654,7 @@
                 selectBtn.classList.remove('active');
                 canvas.classList.remove('select-mode');
                 selectedStrokes = [];  // 選択をクリア
-                redrawAllStrokes();
+                drawBackground();
             }
             updateModeIndicator();
         }
@@ -465,7 +672,7 @@
                 canvas.classList.add('erase-mode');
                 canvas.classList.remove('select-mode');
                 selectedStrokes = [];  // 選択をクリア
-                redrawAllStrokes();
+                drawBackground();
                 // 色ボタンを無効化
                 document.querySelectorAll('.color-btn').forEach(btn => {
                     btn.classList.remove('active');
@@ -490,46 +697,35 @@
             // 選択をクリア
             selectedStrokes = [];
             
-            // 再描画
-            redrawAllStrokes();
+            // 背景を含めて再描画
+            drawBackground();
             updateModeIndicator();  // Update button states
         }
 
         // Save canvas as image
         function saveCanvas() {
-            // Create a temporary canvas
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
+            if (!imageLoaded) {
+                alert('画像を選択してください');
+                return;
+            }
             
-            // Set size to match the original image
-            tempCanvas.width = backgroundImage.naturalWidth;
-            tempCanvas.height = backgroundImage.naturalHeight;
-            
-            // Draw the background image
-            tempCtx.drawImage(backgroundImage, 0, 0);
-            
-            // Draw the canvas content on top
-            const scaleX = backgroundImage.naturalWidth / canvas.width * window.devicePixelRatio;
-            const scaleY = backgroundImage.naturalHeight / canvas.height * window.devicePixelRatio;
-            tempCtx.scale(scaleX, scaleY);
-            tempCtx.drawImage(canvas, 0, 0);
-            
-            // Download the image
+            // FileReaderで読み込んだ画像なのでCORS問題なし
             const link = document.createElement('a');
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
             link.download = `yuragi_graph_${timestamp}.png`;
-            link.href = tempCanvas.toDataURL();
+            link.href = canvas.toDataURL('image/png');
             link.click();
         }
 
         // Check if point is within drawing area
         function isInDrawingArea(x, y) {
-            const rect = backgroundImage.getBoundingClientRect();
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
             const drawingArea = {
-                x: rect.width * drawingAreaRatio.x,
-                y: rect.height * drawingAreaRatio.y,
-                width: rect.width * drawingAreaRatio.width,
-                height: rect.height * drawingAreaRatio.height
+                x: width * drawingAreaRatio.x,
+                y: height * drawingAreaRatio.y,
+                width: width * drawingAreaRatio.width,
+                height: height * drawingAreaRatio.height
             };
             
             return x >= drawingArea.x && 
@@ -540,12 +736,13 @@
         
         // Clamp coordinates to drawing area boundaries
         function clampToDrawingArea(x, y) {
-            const rect = backgroundImage.getBoundingClientRect();
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
             const drawingArea = {
-                x: rect.width * drawingAreaRatio.x,
-                y: rect.height * drawingAreaRatio.y,
-                width: rect.width * drawingAreaRatio.width,
-                height: rect.height * drawingAreaRatio.height
+                x: width * drawingAreaRatio.x,
+                y: height * drawingAreaRatio.y,
+                width: width * drawingAreaRatio.width,
+                height: height * drawingAreaRatio.height
             };
             
             return {
@@ -792,9 +989,6 @@
         function smoothLines() {
             if (allStrokes.length === 0) return;
             
-            // キャンバスをクリア
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             // 選択された線がある場合はそれだけを補正、なければすべてを補正
             if (selectedStrokes.length > 0) {
                 selectedStrokes.forEach(index => {
@@ -815,8 +1009,8 @@
                 });
             }
             
-            // すべてのストロークを再描画
-            redrawAllStrokes();
+            // 背景を含めて再描画
+            drawBackground();
         }
         
         // ストロークを補正する関数
@@ -1044,7 +1238,7 @@
                 } else {
                     selectedStrokes.splice(index, 1);
                 }
-                redrawAllStrokes();
+                drawBackground();
                 updateModeIndicator();  // Update button states
             }
         }
@@ -1103,14 +1297,12 @@
                 selectedStrokes = selectedStrokes.map(index => index > targetIndex ? index - 1 : index);
                 
                 allStrokes.splice(targetIndex, 1);
-                redrawAllStrokes();
+                drawBackground();
             }
         }
         
         // すべてのストロークを再描画
         function redrawAllStrokes() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             allStrokes.forEach((stroke, index) => {
                 if (stroke.points.length < 2) return;
                 
