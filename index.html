@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ゆらぎのグラフ</title>
     <style>
         * {
@@ -22,7 +22,7 @@
         .main-container {
             text-align: center;
             width: 100%;
-            max-width: 1440px;
+            max-width: 1200px;
             box-sizing: border-box;
         }
         .canvas-container {
@@ -30,8 +30,9 @@
             display: block;
             margin: 0 auto;
             width: 100%;
-            max-width: 1400px;
+            max-width: 800px;
             box-sizing: border-box;
+            z-index: 1;
         }
         #drawingCanvas {
             display: none; /* 初期状態では非表示 */
@@ -41,6 +42,7 @@
             cursor: crosshair;
             background: white;
             box-sizing: border-box;
+            touch-action: none; /* タッチ操作を最適化 */
         }
         #drawingCanvas.loaded {
             display: block;
@@ -98,6 +100,9 @@
             justify-content: center;
             gap: 8px;
             transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
         }
         button:hover {
             transform: translateY(-1px);
@@ -185,6 +190,7 @@
             align-items: center;
             gap: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
         }
         .mode-indicator.show {
             display: flex;
@@ -223,6 +229,14 @@
             }
         }
         
+        /* 大画面用の調整 */
+        @media (min-width: 1200px) {
+            .main-container {
+                margin-top: 40px;
+            }
+        }
+        
+        /* タブレット・スマホ用 */
         @media (max-width: 768px) {
             body {
                 padding: 5px;
@@ -251,10 +265,12 @@
                 gap: 10px;
             }
             button {
-                padding: 8px 12px;
-                font-size: 12px;
+                padding: 10px 14px;
+                font-size: 13px;
                 flex: 1;
                 min-width: 110px;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
             }
             button .icon {
                 font-size: 16px;
@@ -378,7 +394,7 @@
             
             // Get container width (with padding consideration)
             const containerWidth = canvas.parentElement.offsetWidth - 20; // 20px for padding
-            const maxWidth = Math.min(containerWidth, 1400);
+            const maxWidth = Math.min(containerWidth, 800);
             
             // Calculate height based on image aspect ratio
             const aspectRatio = backgroundImage.naturalHeight / backgroundImage.naturalWidth;
@@ -812,10 +828,18 @@
             };
             
             if (isInDrawingArea(coords.x, coords.y)) {
-                lastX = coords.x;
-                lastY = coords.y;
-                isDrawing = true;
-                points = [{x: coords.x, y: coords.y}];
+                if (selectMode) {
+                    // 選択モード: タップした位置の線を選択/選択解除
+                    selectStroke(coords.x, coords.y);
+                } else if (eraseMode) {
+                    // 消しゴムモード: タップした位置の線を削除
+                    eraseStroke(coords.x, coords.y);
+                } else {
+                    lastX = coords.x;
+                    lastY = coords.y;
+                    isDrawing = true;
+                    points = [{x: coords.x, y: coords.y}];
+                }
             }
         });
 
@@ -880,9 +904,10 @@
         canvas.addEventListener('touchend', () => {
             if (isDrawing && points.length > 1) {
                 drawSmoothLine();
-                // ストロークを保存
+                // ストロークを保存（下から上への線も正しく処理）
+                const orderedPoints = orderPointsByTime(points);
                 allStrokes.push({
-                    points: [...points],
+                    points: orderedPoints,
                     color: currentColor
                 });
             }
