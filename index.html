@@ -108,6 +108,9 @@
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
+        .color-btn:hover:not(.active) {
+            opacity: 0.8;
+        }
         button .icon {
             font-size: 18px;
         }
@@ -118,10 +121,49 @@
             color: white;
             font-weight: bold;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+        .color-btn:not(.active) {
+            background-image: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)),
+                              linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1));
+            background-size: 10px 10px;
+            background-position: 0 0, 5px 5px;
         }
         .color-btn.active {
             border-color: #FFD700;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 215, 0, 0.3);
+            opacity: 1;
+            transform: scale(1.05);
+            animation: pulse 2s infinite;
+        }
+        .color-btn.active::before {
+            content: '✓';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #FFD700;
+            color: #333;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 215, 0, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(255, 215, 0, 1), inset 0 0 15px rgba(255, 215, 0, 0.5);
+            }
+            100% {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 215, 0, 0.3);
+            }
         }
         .color-label {
             font-size: 14px;
@@ -191,9 +233,21 @@
             gap: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             z-index: 1000;
+            transition: all 0.3s ease;
         }
         .mode-indicator.show {
             display: flex;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         .help-text {
             position: absolute;
@@ -311,10 +365,10 @@
                 <h3>描画ツール</h3>
                 <div class="tool-buttons">
                     <div class="color-selector">
-                        <button class="color-btn black-btn active" onclick="setColor('#333333')" title="黒で描く">
+                        <button class="color-btn black-btn active" onclick="setColor('#333333', event)" title="黒で描く">
                             <span class="color-label">振る舞ってきた性</span>
                         </button>
-                        <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')" title="ピンクで描く">
+                        <button class="color-btn pink-btn" onclick="setColor('#ff6b9d', event)" title="ピンクで描く">
                             <span class="color-label">性自認</span>
                         </button>
                     </div>
@@ -366,6 +420,7 @@
         let imageLoaded = false;
         let isDrawing = false;
         let currentColor = '#333333';
+        let drawingEnabled = true;  // 描画可能フラグ（初期値はtrue）
         let lastX = 0;
         let lastY = 0;
         let scale = 1;
@@ -461,6 +516,13 @@
                 if (window.location.hash === '#debug') {
                     showDrawingArea();
                 }
+                
+                // 初期状態を設定（黒ボタンがアクティブ、描画可能）
+                currentColor = '#333333';
+                drawingEnabled = true;
+                selectMode = false;
+                eraseMode = false;
+                
                 updateModeIndicator();
             };
             
@@ -503,15 +565,24 @@
             
             if (selectMode) {
                 iconSpan.textContent = '👆';
-                textSpan.textContent = '選択モード';
+                textSpan.textContent = '選択モード（描画無効）';
                 indicator.classList.add('show');
+                indicator.style.backgroundColor = '#FF9800';
                 helpText.textContent = '線をクリックして選択してください';
                 helpText.classList.add('show');
             } else if (eraseMode) {
                 iconSpan.textContent = '🧹';
-                textSpan.textContent = '消しゴムモード';
+                textSpan.textContent = '消しゴムモード（描画無効）';
                 indicator.classList.add('show');
+                indicator.style.backgroundColor = '#f44336';
                 helpText.textContent = '消したい線をクリックしてください';
+                helpText.classList.add('show');
+            } else if (drawingEnabled) {
+                iconSpan.textContent = '✏️';
+                textSpan.textContent = '描画モード';
+                indicator.classList.add('show');
+                indicator.style.backgroundColor = '#4CAF50';
+                helpText.textContent = 'クリックまたはドラッグして線を描いてください';
                 helpText.classList.add('show');
             } else {
                 indicator.classList.remove('show');
@@ -531,18 +602,33 @@
         }
         
         // Set drawing color
-        function setColor(color) {
-            eraseMode = false;  // 色を選択したら消しゴムモードを解除
-            selectMode = false;  // 選択モードも解除
-            document.querySelector('.erase-btn').classList.remove('active');
-            document.querySelector('.select-btn').classList.remove('active');
-            canvas.classList.remove('erase-mode');
-            canvas.classList.remove('select-mode');
-            currentColor = color;
-            document.querySelectorAll('.color-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
+        function setColor(color, event) {
+            const clickedBtn = event.target;
+            const wasActive = clickedBtn.classList.contains('active');
+            
+            // 同じボタンをクリックした場合はトグル
+            if (wasActive && currentColor === color) {
+                drawingEnabled = false;
+                currentColor = null;
+                clickedBtn.classList.remove('active');
+            } else {
+                // 別のボタンまたは非アクティブ状態からの選択
+                eraseMode = false;  // 色を選択したら消しゴムモードを解除
+                selectMode = false;  // 選択モードも解除
+                drawingEnabled = true;  // 描画を有効化
+                document.querySelector('.erase-btn').classList.remove('active');
+                document.querySelector('.select-btn').classList.remove('active');
+                canvas.classList.remove('erase-mode');
+                canvas.classList.remove('select-mode');
+                currentColor = color;
+                
+                // すべての色ボタンを非アクティブにしてから、クリックしたボタンをアクティブに
+                document.querySelectorAll('.color-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                clickedBtn.classList.add('active');
+            }
+            
             updateModeIndicator();
         }
 
@@ -559,6 +645,7 @@
         function toggleSelectMode() {
             selectMode = !selectMode;
             eraseMode = false;  // 消しゴムモードを解除
+            drawingEnabled = false;  // 描画を無効化
             const selectBtn = document.querySelector('.select-btn');
             const eraseBtn = document.querySelector('.erase-btn');
             
@@ -584,6 +671,7 @@
         function toggleEraseMode() {
             eraseMode = !eraseMode;
             selectMode = false;  // 選択モードを解除
+            drawingEnabled = false;  // 描画を無効化
             const eraseBtn = document.querySelector('.erase-btn');
             const selectBtn = document.querySelector('.select-btn');
             
@@ -728,7 +816,8 @@
                 } else if (eraseMode) {
                     // 消しゴムモード: クリックした位置の線を削除
                     eraseStroke(coords.x, coords.y);
-                } else {
+                } else if (drawingEnabled && currentColor) {
+                    // 描画が有効かつ色が選択されている場合のみ線を開始
                     isDrawing = true;
                     lastX = coords.x;
                     lastY = coords.y;
@@ -834,7 +923,8 @@
                 } else if (eraseMode) {
                     // 消しゴムモード: タップした位置の線を削除
                     eraseStroke(coords.x, coords.y);
-                } else {
+                } else if (drawingEnabled && currentColor) {
+                    // 描画が有効かつ色が選択されている場合のみ線を開始
                     lastX = coords.x;
                     lastY = coords.y;
                     isDrawing = true;
