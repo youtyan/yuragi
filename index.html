@@ -118,10 +118,10 @@
         
         // Drawing area boundaries (relative to image size)
         const drawingAreaRatio = {
-            x: 90 / 1040,
-            y: 240 / 1160,
-            width: 860 / 1040,
-            height: 780 / 1160
+            x: 140 / 1617,  // 実際の画像サイズに基づいて調整
+            y: 340 / 1792,  // MとFの線の位置に調整
+            width: 1340 / 1617,
+            height: 1250 / 1792
         };
         
         // Set canvas size based on image
@@ -142,7 +142,26 @@
         // Initialize canvas when image loads
         backgroundImage.onload = function() {
             setCanvasSize();
+            // デバッグ用: 描画エリアの境界を表示
+            if (window.location.hash === '#debug') {
+                showDrawingArea();
+            }
         };
+        
+        // デバッグ用: 描画エリアを可視化
+        function showDrawingArea() {
+            const rect = backgroundImage.getBoundingClientRect();
+            const drawingArea = {
+                x: rect.width * drawingAreaRatio.x,
+                y: rect.height * drawingAreaRatio.y,
+                width: rect.width * drawingAreaRatio.width,
+                height: rect.height * drawingAreaRatio.height
+            };
+            
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(drawingArea.x, drawingArea.y, drawingArea.width, drawingArea.height);
+        }
         
         // Resize canvas when window resizes
         window.addEventListener('resize', () => {
