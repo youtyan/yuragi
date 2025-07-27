@@ -224,6 +224,22 @@
                    y >= drawingArea.y && 
                    y <= drawingArea.y + drawingArea.height;
         }
+        
+        // Clamp coordinates to drawing area boundaries
+        function clampToDrawingArea(x, y) {
+            const rect = backgroundImage.getBoundingClientRect();
+            const drawingArea = {
+                x: rect.width * drawingAreaRatio.x,
+                y: rect.height * drawingAreaRatio.y,
+                width: rect.width * drawingAreaRatio.width,
+                height: rect.height * drawingAreaRatio.height
+            };
+            
+            return {
+                x: Math.max(drawingArea.x, Math.min(drawingArea.x + drawingArea.width, x)),
+                y: Math.max(drawingArea.y, Math.min(drawingArea.y + drawingArea.height, y))
+            };
+        }
 
         // Get coordinates relative to canvas
         function getCoordinates(e) {
@@ -249,24 +265,20 @@
             if (!isDrawing) return;
             
             const coords = getCoordinates(e);
+            const clampedCoords = clampToDrawingArea(coords.x, coords.y);
             
-            // Only draw if within drawing area
-            if (isInDrawingArea(coords.x, coords.y)) {
-                ctx.strokeStyle = currentColor;
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(coords.x, coords.y);
-                ctx.stroke();
-                
-                lastX = coords.x;
-                lastY = coords.y;
-            } else {
-                isDrawing = false;
-            }
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(clampedCoords.x, clampedCoords.y);
+            ctx.stroke();
+            
+            lastX = clampedCoords.x;
+            lastY = clampedCoords.y;
         });
 
         canvas.addEventListener('mouseup', () => {
@@ -305,22 +317,20 @@
                 y: touch.clientY - rect.top
             };
             
-            if (isInDrawingArea(coords.x, coords.y)) {
-                ctx.strokeStyle = currentColor;
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(coords.x, coords.y);
-                ctx.stroke();
-                
-                lastX = coords.x;
-                lastY = coords.y;
-            } else {
-                isDrawing = false;
-            }
+            const clampedCoords = clampToDrawingArea(coords.x, coords.y);
+            
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(clampedCoords.x, clampedCoords.y);
+            ctx.stroke();
+            
+            lastX = clampedCoords.x;
+            lastY = clampedCoords.y;
         });
 
         canvas.addEventListener('touchend', () => {
