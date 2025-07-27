@@ -18,17 +18,27 @@
         .main-container {
             text-align: center;
             width: 100%;
-            max-width: 860px;
+            max-width: 1060px;
         }
-        canvas {
-            border-radius: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            cursor: crosshair;
-            display: block;
+        .canvas-container {
+            position: relative;
+            display: inline-block;
             margin: 0 auto;
+        }
+        #backgroundImage {
+            display: block;
             width: 100%;
             height: auto;
-            max-width: 840px;
+            max-width: 1040px;
+            border-radius: 20px;
+        }
+        #drawingCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
         }
         .controls {
             margin-top: 20px;
@@ -83,7 +93,10 @@
 </head>
 <body>
     <div class="main-container">
-        <canvas id="drawingCanvas"></canvas>
+        <div class="canvas-container">
+            <img id="backgroundImage" src="Graph.png" alt="ゆらぎのグラフ">
+            <canvas id="drawingCanvas"></canvas>
+        </div>
         
         <div class="controls">
             <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
@@ -96,163 +109,45 @@
     <script>
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
+        const backgroundImage = document.getElementById('backgroundImage');
         let isDrawing = false;
         let currentColor = '#333333';
         let lastX = 0;
         let lastY = 0;
         let scale = 1;
         
-        // Set canvas size based on viewport
+        // Drawing area boundaries (relative to image size)
+        const drawingAreaRatio = {
+            x: 90 / 1040,
+            y: 240 / 1160,
+            width: 860 / 1040,
+            height: 780 / 1160
+        };
+        
+        // Set canvas size based on image
         function setCanvasSize() {
-            const containerWidth = canvas.parentElement.offsetWidth;
-            const maxWidth = 840;
-            const maxHeight = 700;
+            const rect = backgroundImage.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
             
-            if (containerWidth < maxWidth) {
-                scale = containerWidth / maxWidth;
-                canvas.width = containerWidth;
-                canvas.height = maxHeight * scale;
-            } else {
-                scale = 1;
-                canvas.width = maxWidth;
-                canvas.height = maxHeight;
-            }
-            
-            // Set canvas actual size for high DPI displays
+            // Adjust for high DPI displays
             const dpr = window.devicePixelRatio || 1;
-            canvas.style.width = canvas.width + 'px';
-            canvas.style.height = canvas.height + 'px';
             canvas.width *= dpr;
             canvas.height *= dpr;
-            ctx.scale(dpr * scale, dpr * scale);
-            
-            drawStaticElements();
+            ctx.scale(dpr, dpr);
         }
         
-        // Drawing area boundaries (original size)
-        const drawingArea = {
-            x: 70,
-            y: 200,
-            width: 700,
-            height: 420
+        // Initialize canvas when image loads
+        backgroundImage.onload = function() {
+            setCanvasSize();
         };
-
-        // Helper function to draw rounded rectangle
-        function roundRect(ctx, x, y, width, height, radius) {
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + width - radius, y);
-            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-            ctx.lineTo(x + width, y + height - radius);
-            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-            ctx.lineTo(x + radius, y + height);
-            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-        }
-
-        // Draw the static elements
-        function drawStaticElements() {
-            // Clear canvas
-            ctx.clearRect(0, 0, 840, 700);
-            
-            // Fill light purple background
-            ctx.fillStyle = '#f5f0f8';
-            ctx.fillRect(0, 0, 840, 700);
-            
-            // Draw main container with border
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
-            roundRect(ctx, 20, 20, 800, 660, 50);
-            ctx.stroke();
-            
-            // Draw header background
-            ctx.fillStyle = '#f5f5a0';
-            roundRect(ctx, 170, 30, 500, 70, 35);
-            ctx.fill();
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            roundRect(ctx, 170, 30, 500, 70, 35);
-            ctx.stroke();
-            
-            // Add title
-            ctx.font = 'bold 32px "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial';
-            ctx.fillStyle = '#000';
-            ctx.textAlign = 'center';
-            ctx.fillText('ゆらぎのグラフ', 420, 75);
-            
-            // Add legend
-            ctx.font = '18px "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial';
-            ctx.textAlign = 'center';
-            
-            // Black line legend
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(240, 160);
-            ctx.lineTo(270, 160);
-            ctx.stroke();
-            ctx.fillStyle = '#333';
-            ctx.fillText('振る舞ってきた性', 350, 165);
-            
-            // Pink line legend
-            ctx.strokeStyle = '#ff6b9d';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(480, 160);
-            ctx.lineTo(510, 160);
-            ctx.stroke();
-            ctx.fillStyle = '#ff6b9d';
-            ctx.fillText('性自認', 560, 165);
-            
-            // Draw graph area background
-            ctx.fillStyle = '#f8f3e8';
-            ctx.fillRect(drawingArea.x, drawingArea.y, drawingArea.width, drawingArea.height);
-            
-            // Draw horizontal line
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(drawingArea.x, drawingArea.y);
-            ctx.lineTo(drawingArea.x + drawingArea.width, drawingArea.y);
-            ctx.stroke();
-            
-            // Draw center line
-            ctx.strokeStyle = '#999';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(drawingArea.x + drawingArea.width / 2, drawingArea.y);
-            ctx.lineTo(drawingArea.x + drawingArea.width / 2, drawingArea.y + drawingArea.height);
-            ctx.stroke();
-            
-            // Add axis labels
-            ctx.font = '24px "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial';
-            ctx.fillStyle = '#666';
-            ctx.textAlign = 'left';
-            ctx.fillText('M', 100, 220);
-            ctx.textAlign = 'right';
-            ctx.fillText('F', 740, 220);
-            
-            // Add Y-axis labels
-            ctx.font = '20px "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial';
-            ctx.fillStyle = '#888';
-            ctx.textAlign = 'right';
-            ctx.fillText('1', 60, 270);
-            ctx.fillText('2', 60, 370);
-            ctx.fillText('3', 60, 470);
-            ctx.fillText('4', 60, 570);
-            
-            // Add "現在" label
-            ctx.font = '18px "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#666';
-            ctx.fillText('現在', 420, 640);
-        }
-
-        // Initialize canvas
-        setCanvasSize();
-        window.addEventListener('resize', setCanvasSize);
+        
+        // Resize canvas when window resizes
+        window.addEventListener('resize', () => {
+            setCanvasSize();
+        });
 
         // Set drawing color
         function setColor(color) {
@@ -265,52 +160,64 @@
 
         // Clear canvas
         function clearCanvas() {
-            drawStaticElements();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         // Save canvas as image
         function saveCanvas() {
-            // Create a temporary canvas at original size
+            // Create a temporary canvas
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = 840;
-            tempCanvas.height = 700;
             
-            // Get the current canvas content and draw it at original size
-            const imgData = canvas.toDataURL();
-            const img = new Image();
-            img.onload = function() {
-                tempCtx.drawImage(img, 0, 0, 840, 700);
-                const link = document.createElement('a');
-                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
-                link.download = `yuragi_graph_${timestamp}.png`;
-                link.href = tempCanvas.toDataURL();
-                link.click();
-            };
-            img.src = imgData;
+            // Set size to match the original image
+            tempCanvas.width = backgroundImage.naturalWidth;
+            tempCanvas.height = backgroundImage.naturalHeight;
+            
+            // Draw the background image
+            tempCtx.drawImage(backgroundImage, 0, 0);
+            
+            // Draw the canvas content on top
+            const scaleX = backgroundImage.naturalWidth / canvas.width * window.devicePixelRatio;
+            const scaleY = backgroundImage.naturalHeight / canvas.height * window.devicePixelRatio;
+            tempCtx.scale(scaleX, scaleY);
+            tempCtx.drawImage(canvas, 0, 0);
+            
+            // Download the image
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:\-]/g, '');
+            link.download = `yuragi_graph_${timestamp}.png`;
+            link.href = tempCanvas.toDataURL();
+            link.click();
         }
 
         // Check if point is within drawing area
         function isInDrawingArea(x, y) {
+            const rect = backgroundImage.getBoundingClientRect();
+            const drawingArea = {
+                x: rect.width * drawingAreaRatio.x,
+                y: rect.height * drawingAreaRatio.y,
+                width: rect.width * drawingAreaRatio.width,
+                height: rect.height * drawingAreaRatio.height
+            };
+            
             return x >= drawingArea.x && 
                    x <= drawingArea.x + drawingArea.width && 
                    y >= drawingArea.y && 
                    y <= drawingArea.y + drawingArea.height;
         }
 
-        // Get coordinates adjusted for scale
-        function getCoordinates(e, rect) {
-            const dpr = window.devicePixelRatio || 1;
+        // Get coordinates relative to canvas
+        function getCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
             return {
-                x: (e.clientX - rect.left) / scale,
-                y: (e.clientY - rect.top) / scale
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
             };
         }
 
         // Drawing functions
         canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const coords = getCoordinates(e, rect);
+            const coords = getCoordinates(e);
             
             if (isInDrawingArea(coords.x, coords.y)) {
                 isDrawing = true;
@@ -322,8 +229,7 @@
         canvas.addEventListener('mousemove', (e) => {
             if (!isDrawing) return;
             
-            const rect = canvas.getBoundingClientRect();
-            const coords = getCoordinates(e, rect);
+            const coords = getCoordinates(e);
             
             // Only draw if within drawing area
             if (isInDrawingArea(coords.x, coords.y)) {
@@ -358,8 +264,8 @@
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
             const coords = {
-                x: (touch.clientX - rect.left) / scale,
-                y: (touch.clientY - rect.top) / scale
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
             };
             
             if (isInDrawingArea(coords.x, coords.y)) {
@@ -376,8 +282,8 @@
             const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
             const coords = {
-                x: (touch.clientX - rect.left) / scale,
-                y: (touch.clientY - rect.top) / scale
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
             };
             
             if (isInDrawingArea(coords.x, coords.y)) {
