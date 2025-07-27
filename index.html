@@ -40,6 +40,12 @@
             height: 100%;
             cursor: crosshair;
         }
+        #drawingCanvas.select-mode {
+            cursor: pointer;
+        }
+        #drawingCanvas.erase-mode {
+            cursor: not-allowed;
+        }
         .controls {
             margin-top: 20px;
             text-align: center;
@@ -80,6 +86,29 @@
             background-color: #2196F3;
             color: white;
         }
+        .undo-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+        .erase-btn {
+            background-color: #9C27B0;
+            color: white;
+        }
+        .erase-btn.active {
+            background-color: #6A1B9A;
+        }
+        .select-btn {
+            background-color: #607D8B;
+            color: white;
+        }
+        .select-btn.active {
+            background-color: #2196F3;
+            box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
+            transform: scale(1.05);
+        }
+        .selected-stroke {
+            filter: drop-shadow(0 0 5px #2196F3);
+        }
         @media (max-width: 480px) {
             body {
                 padding: 5px;
@@ -105,6 +134,9 @@
         <div class="controls">
             <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
             <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')"></button>
+            <button class="select-btn" onclick="toggleSelectMode()">線を選択</button>
+            <button class="erase-btn" onclick="toggleEraseMode()">線を消す</button>
+            <button class="undo-btn" onclick="undoStroke()">元に戻す</button>
             <button class="clear-btn" onclick="clearCanvas()">クリア</button>
             <button class="smooth-btn" onclick="smoothLines()">線を補正</button>
             <button class="save-btn" onclick="saveCanvas()">画像を保存</button>
@@ -123,6 +155,10 @@
         let points = [];  // 描画ポイントを保存
         const minDistance = 3;  // 最小移動距離（手ブレ補正）
         let allStrokes = [];  // すべてのストロークを保存
+        let strokeHistory = [];  // 補正前の履歴を保存
+        let eraseMode = false;  // 消しゴムモード
+        let selectMode = false;  // 選択モード
+        let selectedStrokes = [];  // 選択された線のインデックス
         
         // Drawing area boundaries (relative to image size)
         const drawingAreaRatio = {
@@ -178,6 +214,12 @@
 
         // Set drawing color
         function setColor(color) {
+            eraseMode = false;  // 色を選択したら消しゴムモードを解除
+            selectMode = false;  // 選択モードも解除
+            document.querySelector('.erase-btn').classList.remove('active');
+            document.querySelector('.select-btn').classList.remove('active');
+            canvas.classList.remove('erase-mode');
+            canvas.classList.remove('select-mode');
             currentColor = color;
             document.querySelectorAll('.color-btn').forEach(btn => {
                 btn.classList.remove('active');
@@ -189,6 +231,70 @@
         function clearCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             allStrokes = [];
+            strokeHistory = [];
+            selectedStrokes = [];
+        }
+        
+        // Toggle select mode
+        function toggleSelectMode() {
+            selectMode = !selectMode;
+            eraseMode = false;  // 消しゴムモードを解除
+            const selectBtn = document.querySelector('.select-btn');
+            const eraseBtn = document.querySelector('.erase-btn');
+            
+            if (selectMode) {
+                selectBtn.classList.add('active');
+                eraseBtn.classList.remove('active');
+                canvas.classList.add('select-mode');
+                canvas.classList.remove('erase-mode');
+                // 色ボタンを無効化
+                document.querySelectorAll('.color-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+            } else {
+                selectBtn.classList.remove('active');
+                canvas.classList.remove('select-mode');
+                selectedStrokes = [];  // 選択をクリア
+                redrawAllStrokes();
+            }
+        }
+        
+        // Toggle erase mode
+        function toggleEraseMode() {
+            eraseMode = !eraseMode;
+            selectMode = false;  // 選択モードを解除
+            const eraseBtn = document.querySelector('.erase-btn');
+            const selectBtn = document.querySelector('.select-btn');
+            
+            if (eraseMode) {
+                eraseBtn.classList.add('active');
+                selectBtn.classList.remove('active');
+                canvas.classList.add('erase-mode');
+                canvas.classList.remove('select-mode');
+                selectedStrokes = [];  // 選択をクリア
+                redrawAllStrokes();
+                // 色ボタンを無効化
+                document.querySelectorAll('.color-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+            } else {
+                eraseBtn.classList.remove('active');
+                canvas.classList.remove('erase-mode');
+            }
+        }
+        
+        // Undo last stroke
+        function undoStroke() {
+            if (strokeHistory.length > 0) {
+                // 最後の履歴を復元
+                allStrokes = JSON.parse(JSON.stringify(strokeHistory[strokeHistory.length - 1]));
+                strokeHistory.pop();
+                redrawAllStrokes();
+            } else if (allStrokes.length > 0) {
+                // 履歴がない場合は最後のストロークを削除
+                allStrokes.pop();
+                redrawAllStrokes();
+            }
         }
 
         // Save canvas as image
@@ -300,10 +406,18 @@
             const coords = getCoordinates(e);
             
             if (isInDrawingArea(coords.x, coords.y)) {
-                isDrawing = true;
-                lastX = coords.x;
-                lastY = coords.y;
-                points = [{x: coords.x, y: coords.y}];  // 新しい線を開始
+                if (selectMode) {
+                    // 選択モード: クリックした位置の線を選択/選択解除
+                    selectStroke(coords.x, coords.y);
+                } else if (eraseMode) {
+                    // 消しゴムモード: クリックした位置の線を削除
+                    eraseStroke(coords.x, coords.y);
+                } else {
+                    isDrawing = true;
+                    lastX = coords.x;
+                    lastY = coords.y;
+                    points = [{x: coords.x, y: coords.y}];  // 新しい線を開始
+                }
             }
         });
 
@@ -363,9 +477,10 @@
             if (isDrawing && points.length > 1) {
                 // 最終的な滑らかな線を描画
                 drawSmoothLine();
-                // ストロークを保存
+                // ストロークを保存（下から上への線も正しく処理）
+                const orderedPoints = orderPointsByTime(points);
                 allStrokes.push({
-                    points: [...points],
+                    points: orderedPoints,
                     color: currentColor
                 });
             }
@@ -479,17 +594,31 @@
         function smoothLines() {
             if (allStrokes.length === 0) return;
             
+            // 現在の状態を履歴に保存
+            strokeHistory.push(JSON.parse(JSON.stringify(allStrokes)));
+            
             // キャンバスをクリア
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // 各ストロークを補正して再描画
-            allStrokes = allStrokes.map(stroke => {
-                const smoothedPoints = smoothStroke(stroke.points);
-                return {
-                    points: smoothedPoints,
-                    color: stroke.color
-                };
-            });
+            // 選択された線がある場合はそれだけを補正、なければすべてを補正
+            if (selectedStrokes.length > 0) {
+                selectedStrokes.forEach(index => {
+                    if (allStrokes[index]) {
+                        const smoothedPoints = smoothStroke(allStrokes[index].points);
+                        allStrokes[index].points = smoothedPoints;
+                    }
+                });
+                // 選択を維持（クリアしない）
+            } else {
+                // 各ストロークを補正して再描画
+                allStrokes = allStrokes.map(stroke => {
+                    const smoothedPoints = smoothStroke(stroke.points);
+                    return {
+                        points: smoothedPoints,
+                        color: stroke.color
+                    };
+                });
+            }
             
             // すべてのストロークを再描画
             redrawAllStrokes();
@@ -497,16 +626,36 @@
         
         // ストロークを補正する関数
         function smoothStroke(originalPoints) {
-            if (originalPoints.length < 5) return originalPoints;
+            if (originalPoints.length < 3) return originalPoints;
             
-            // 1. 時系列として整理（Y座標が単調増加になるように）
-            const timeOrdered = enforceTimelineConstraints(originalPoints);
+            // ポイント数を維持しながら滑らかにする
+            const smoothed = [];
+            const smoothingStrength = 0.3;  // 補正の強さ（0=補正なし、1=最大補正）
             
-            // 2. ダグラス・ペッカーアルゴリズムで重要なポイントを抽出
-            const simplified = douglasPeucker(timeOrdered, 3.0);
+            // 最初のポイントはそのまま
+            smoothed.push(originalPoints[0]);
             
-            // 3. カーディナルスプラインで滑らかに補間
-            return generateCardinalSpline(simplified, 0.5, 10);
+            // 中間のポイントを補正（前後のポイントとのブレンド）
+            for (let i = 1; i < originalPoints.length - 1; i++) {
+                const prev = originalPoints[i - 1];
+                const curr = originalPoints[i];
+                const next = originalPoints[i + 1];
+                
+                // 前後のポイントの中点
+                const midX = (prev.x + next.x) / 2;
+                const midY = (prev.y + next.y) / 2;
+                
+                // 現在のポイントと中点をブレンド
+                smoothed.push({
+                    x: curr.x * (1 - smoothingStrength) + midX * smoothingStrength,
+                    y: curr.y * (1 - smoothingStrength) + midY * smoothingStrength
+                });
+            }
+            
+            // 最後のポイントはそのまま
+            smoothed.push(originalPoints[originalPoints.length - 1]);
+            
+            return smoothed;
         }
         
         // 時系列制約を適用（Y座標が単調増加、同じY座標での往復を防ぐ）
@@ -650,12 +799,134 @@
             return { x, y };
         }
         
+        
+        // ポイントを時間順に並べる（下から上への描画対応）
+        function orderPointsByTime(points) {
+            if (points.length < 2) return points;
+            
+            // 最初と最後のY座標を比較
+            const startY = points[0].y;
+            const endY = points[points.length - 1].y;
+            
+            // 下から上に描画された場合は反転
+            if (startY > endY) {
+                return points.slice().reverse();
+            }
+            
+            return points;
+        }
+        
+        // 線を選択する機能
+        function selectStroke(x, y) {
+            const threshold = 20;  // クリック位置からの距離の閾値（増やして選択しやすく）
+            
+            // クリック位置に最も近い線を探す
+            let minDistance = Infinity;
+            let targetIndex = -1;
+            
+            for (let i = 0; i < allStrokes.length; i++) {
+                const stroke = allStrokes[i];
+                // 線分ごとに最短距離をチェック
+                for (let j = 0; j < stroke.points.length - 1; j++) {
+                    const p1 = stroke.points[j];
+                    const p2 = stroke.points[j + 1];
+                    
+                    // 点から線分への最短距離を計算
+                    const distance = pointToLineDistance(x, y, p1.x, p1.y, p2.x, p2.y);
+                    
+                    if (distance < minDistance && distance < threshold) {
+                        minDistance = distance;
+                        targetIndex = i;
+                    }
+                }
+            }
+            
+            // 見つかった線を選択/選択解除
+            if (targetIndex !== -1) {
+                const index = selectedStrokes.indexOf(targetIndex);
+                if (index === -1) {
+                    selectedStrokes.push(targetIndex);
+                } else {
+                    selectedStrokes.splice(index, 1);
+                }
+                redrawAllStrokes();
+            }
+        }
+        
+        // 点から線分への最短距離を計算
+        function pointToLineDistance(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            
+            if (dx === 0 && dy === 0) {
+                // 線分が点の場合
+                return Math.sqrt(Math.pow(px - x1, 2) + Math.pow(py - y1, 2));
+            }
+            
+            // 線分上の最近点のパラメータを計算
+            const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+            
+            // 最近点の座標
+            const nearestX = x1 + t * dx;
+            const nearestY = y1 + t * dy;
+            
+            // 最近点までの距離
+            return Math.sqrt(Math.pow(px - nearestX, 2) + Math.pow(py - nearestY, 2));
+        }
+        
+        // 線を消す機能
+        function eraseStroke(x, y) {
+            const threshold = 20;  // クリック位置からの距離の閾値（選択と同じに）
+            
+            // クリック位置に最も近い線を探す
+            let minDistance = Infinity;
+            let targetIndex = -1;
+            
+            for (let i = 0; i < allStrokes.length; i++) {
+                const stroke = allStrokes[i];
+                // 線分ごとに最短距離をチェック
+                for (let j = 0; j < stroke.points.length - 1; j++) {
+                    const p1 = stroke.points[j];
+                    const p2 = stroke.points[j + 1];
+                    
+                    // 点から線分への最短距離を計算
+                    const distance = pointToLineDistance(x, y, p1.x, p1.y, p2.x, p2.y);
+                    
+                    if (distance < minDistance && distance < threshold) {
+                        minDistance = distance;
+                        targetIndex = i;
+                    }
+                }
+            }
+            
+            // 見つかった線を削除
+            if (targetIndex !== -1) {
+                // 選択されていた線を削除する場合は選択リストも更新
+                selectedStrokes = selectedStrokes.filter(index => index !== targetIndex);
+                // 削除した線より後のインデックスを調整
+                selectedStrokes = selectedStrokes.map(index => index > targetIndex ? index - 1 : index);
+                
+                allStrokes.splice(targetIndex, 1);
+                redrawAllStrokes();
+            }
+        }
+        
         // すべてのストロークを再描画
         function redrawAllStrokes() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            allStrokes.forEach(stroke => {
+            allStrokes.forEach((stroke, index) => {
                 if (stroke.points.length < 2) return;
+                
+                // 選択された線は青い影を付ける
+                if (selectedStrokes.includes(index)) {
+                    ctx.shadowColor = '#2196F3';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
                 
                 ctx.strokeStyle = stroke.color;
                 ctx.lineWidth = 3;
@@ -680,6 +951,9 @@
                 }
                 
                 ctx.stroke();
+                
+                // 影をリセット
+                ctx.shadowBlur = 0;
             });
         }
     </script>
