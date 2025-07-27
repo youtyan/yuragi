@@ -48,25 +48,70 @@
         }
         .controls {
             margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 10px;
+        }
+        .control-group {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
             text-align: center;
+            font-weight: normal;
+        }
+        .tool-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .color-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
         }
         button {
-            padding: 10px 20px;
-            margin: 5px;
+            padding: 10px 15px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        button .icon {
+            font-size: 18px;
         }
         .color-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin: 0 5px;
+            position: relative;
+            padding: 12px 20px;
             border: 3px solid transparent;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
         .color-btn.active {
-            border-color: #333;
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        .color-label {
+            font-size: 14px;
         }
         .black-btn {
             background-color: #333;
@@ -74,72 +119,181 @@
         .pink-btn {
             background-color: #ff6b9d;
         }
-        .clear-btn {
-            background-color: #ff4444;
-            color: white;
+        .tool-btn {
+            background-color: #f5f5f5;
+            color: #333;
+            border: 2px solid #ddd;
         }
-        .save-btn {
+        .tool-btn:hover {
+            background-color: #e0e0e0;
+        }
+        .tool-btn.active {
+            background-color: #2196F3;
+            color: white;
+            border-color: #2196F3;
+            box-shadow: 0 0 10px rgba(33, 150, 243, 0.4);
+        }
+        .smooth-btn {
             background-color: #4CAF50;
             color: white;
         }
-        .smooth-btn {
+        .smooth-btn:hover {
+            background-color: #45a049;
+        }
+        .delete-selected-btn {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .delete-selected-btn:hover {
+            background-color: #ff5252;
+        }
+        .clear-btn {
+            background-color: #9E9E9E;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #757575;
+        }
+        .save-btn {
             background-color: #2196F3;
             color: white;
         }
-        .undo-btn {
-            background-color: #FF9800;
-            color: white;
-        }
-        .erase-btn {
-            background-color: #9C27B0;
-            color: white;
-        }
-        .erase-btn.active {
-            background-color: #6A1B9A;
-        }
-        .select-btn {
-            background-color: #607D8B;
-            color: white;
-        }
-        .select-btn.active {
-            background-color: #2196F3;
-            box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
-            transform: scale(1.05);
+        .save-btn:hover {
+            background-color: #1976D2;
         }
         .selected-stroke {
             filter: drop-shadow(0 0 5px #2196F3);
         }
-        @media (max-width: 480px) {
-            body {
-                padding: 5px;
+        .mode-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .mode-indicator.show {
+            display: flex;
+        }
+        .help-text {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+            white-space: nowrap;
+        }
+        .help-text.show {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .controls {
+                gap: 10px;
+            }
+            .control-group {
+                min-width: 100%;
+                padding: 10px;
+            }
+            .tool-buttons {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .color-selector {
+                flex-direction: row;
+                justify-content: center;
             }
             button {
-                padding: 8px 16px;
-                font-size: 14px;
+                padding: 8px 12px;
+                font-size: 12px;
+                flex: 1;
+                min-width: 120px;
             }
-            .color-btn {
-                width: 35px;
-                height: 35px;
+            button .icon {
+                font-size: 16px;
+            }
+            .mode-indicator {
+                top: 10px;
+                right: 10px;
+                font-size: 12px;
+                padding: 8px 15px;
             }
         }
     </style>
 </head>
 <body>
+    <div class="mode-indicator" id="modeIndicator">
+        <span class="mode-icon"></span>
+        <span class="mode-text"></span>
+    </div>
     <div class="main-container">
         <div class="canvas-container">
             <img id="backgroundImage" src="Graph.png" alt="ゆらぎのグラフ">
             <canvas id="drawingCanvas"></canvas>
+            <div class="help-text" id="helpText"></div>
         </div>
         
         <div class="controls">
-            <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
-            <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')"></button>
-            <button class="select-btn" onclick="toggleSelectMode()">線を選択</button>
-            <button class="erase-btn" onclick="toggleEraseMode()">線を消す</button>
-            <button class="undo-btn" onclick="undoStroke()">元に戻す</button>
-            <button class="clear-btn" onclick="clearCanvas()">クリア</button>
-            <button class="smooth-btn" onclick="smoothLines()">線を補正</button>
-            <button class="save-btn" onclick="saveCanvas()">画像を保存</button>
+            <div class="control-group drawing-tools">
+                <h3>描画ツール</h3>
+                <div class="tool-buttons">
+                    <div class="color-selector">
+                        <button class="color-btn black-btn active" onclick="setColor('#333333')" title="黒で描く">
+                            <span class="color-label">振る舞ってきた性</span>
+                        </button>
+                        <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')" title="ピンクで描く">
+                            <span class="color-label">性自認</span>
+                        </button>
+                    </div>
+                    <button class="select-btn tool-btn" onclick="toggleSelectMode()">
+                        <span class="icon">👆</span>
+                        <span>線を選択</span>
+                    </button>
+                    <button class="erase-btn tool-btn" onclick="toggleEraseMode()">
+                        <span class="icon">🧹</span>
+                        <span>消しゴム</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="control-group edit-tools">
+                <h3>編集</h3>
+                <div class="tool-buttons">
+                    <button class="smooth-btn" onclick="smoothLines()">
+                        <span class="icon">✨</span>
+                        <span>線をなめらかに</span>
+                    </button>
+                    <button class="delete-selected-btn" onclick="deleteSelectedStrokes()">
+                        <span class="icon">🗑️</span>
+                        <span>選択した線を削除</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="control-group file-tools">
+                <h3>ファイル</h3>
+                <div class="tool-buttons">
+                    <button class="clear-btn" onclick="clearCanvas()">
+                        <span class="icon">🆕</span>
+                        <span>すべて消す</span>
+                    </button>
+                    <button class="save-btn" onclick="saveCanvas()">
+                        <span class="icon">💾</span>
+                        <span>画像を保存</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -155,7 +309,6 @@
         let points = [];  // 描画ポイントを保存
         const minDistance = 3;  // 最小移動距離（手ブレ補正）
         let allStrokes = [];  // すべてのストロークを保存
-        let strokeHistory = [];  // 補正前の履歴を保存
         let eraseMode = false;  // 消しゴムモード
         let selectMode = false;  // 選択モード
         let selectedStrokes = [];  // 選択された線のインデックス
@@ -190,6 +343,8 @@
             if (window.location.hash === '#debug') {
                 showDrawingArea();
             }
+            // Initialize UI state
+            updateModeIndicator();
         };
         
         // デバッグ用: 描画エリアを可視化
@@ -212,6 +367,43 @@
             setCanvasSize();
         });
 
+        // Update mode indicator
+        function updateModeIndicator() {
+            const indicator = document.getElementById('modeIndicator');
+            const iconSpan = indicator.querySelector('.mode-icon');
+            const textSpan = indicator.querySelector('.mode-text');
+            const helpText = document.getElementById('helpText');
+            const deleteBtn = document.querySelector('.delete-selected-btn');
+            
+            if (selectMode) {
+                iconSpan.textContent = '👆';
+                textSpan.textContent = '選択モード';
+                indicator.classList.add('show');
+                helpText.textContent = '線をクリックして選択してください';
+                helpText.classList.add('show');
+            } else if (eraseMode) {
+                iconSpan.textContent = '🧹';
+                textSpan.textContent = '消しゴムモード';
+                indicator.classList.add('show');
+                helpText.textContent = '消したい線をクリックしてください';
+                helpText.classList.add('show');
+            } else {
+                indicator.classList.remove('show');
+                helpText.classList.remove('show');
+            }
+            
+            // Update delete button state
+            if (selectedStrokes.length > 0) {
+                deleteBtn.style.opacity = '1';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.disabled = false;
+            } else {
+                deleteBtn.style.opacity = '0.5';
+                deleteBtn.style.cursor = 'not-allowed';
+                deleteBtn.disabled = true;
+            }
+        }
+        
         // Set drawing color
         function setColor(color) {
             eraseMode = false;  // 色を選択したら消しゴムモードを解除
@@ -225,13 +417,13 @@
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
+            updateModeIndicator();
         }
 
         // Clear canvas
         function clearCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             allStrokes = [];
-            strokeHistory = [];
             selectedStrokes = [];
         }
         
@@ -257,6 +449,7 @@
                 selectedStrokes = [];  // 選択をクリア
                 redrawAllStrokes();
             }
+            updateModeIndicator();
         }
         
         // Toggle erase mode
@@ -281,20 +474,25 @@
                 eraseBtn.classList.remove('active');
                 canvas.classList.remove('erase-mode');
             }
+            updateModeIndicator();
         }
         
-        // Undo last stroke
-        function undoStroke() {
-            if (strokeHistory.length > 0) {
-                // 最後の履歴を復元
-                allStrokes = JSON.parse(JSON.stringify(strokeHistory[strokeHistory.length - 1]));
-                strokeHistory.pop();
-                redrawAllStrokes();
-            } else if (allStrokes.length > 0) {
-                // 履歴がない場合は最後のストロークを削除
-                allStrokes.pop();
-                redrawAllStrokes();
-            }
+        // Delete selected strokes
+        function deleteSelectedStrokes() {
+            if (selectedStrokes.length === 0) return;
+            
+            // 選択された線を削除（インデックスの大きい順に削除）
+            selectedStrokes.sort((a, b) => b - a);
+            selectedStrokes.forEach(index => {
+                allStrokes.splice(index, 1);
+            });
+            
+            // 選択をクリア
+            selectedStrokes = [];
+            
+            // 再描画
+            redrawAllStrokes();
+            updateModeIndicator();  // Update button states
         }
 
         // Save canvas as image
@@ -594,9 +792,6 @@
         function smoothLines() {
             if (allStrokes.length === 0) return;
             
-            // 現在の状態を履歴に保存
-            strokeHistory.push(JSON.parse(JSON.stringify(allStrokes)));
-            
             // キャンバスをクリア
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -850,6 +1045,7 @@
                     selectedStrokes.splice(index, 1);
                 }
                 redrawAllStrokes();
+                updateModeIndicator();  // Update button states
             }
         }
         
