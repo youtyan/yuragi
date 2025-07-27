@@ -365,7 +365,7 @@
                 <h3>描画ツール</h3>
                 <div class="tool-buttons">
                     <div class="color-selector">
-                        <button class="color-btn black-btn active" onclick="setColor('#333333', event)" title="黒で描く">
+                        <button class="color-btn black-btn" onclick="setColor('#333333', event)" title="黒で描く">
                             <span class="color-label">振る舞ってきた性</span>
                         </button>
                         <button class="color-btn pink-btn" onclick="setColor('#ff6b9d', event)" title="ピンクで描く">
@@ -419,8 +419,8 @@
         let backgroundImage = new Image();
         let imageLoaded = false;
         let isDrawing = false;
-        let currentColor = '#333333';
-        let drawingEnabled = true;  // 描画可能フラグ（初期値はtrue）
+        let currentColor = null;  // 初期値はnullに設定
+        let drawingEnabled = false;  // 描画可能フラグ（初期値はfalse）
         let lastX = 0;
         let lastY = 0;
         let scale = 1;
@@ -523,6 +523,12 @@
                 selectMode = false;
                 eraseMode = false;
                 
+                // 黒ボタンをアクティブに設定
+                const blackBtn = document.querySelector('.black-btn');
+                if (blackBtn) {
+                    blackBtn.classList.add('active');
+                }
+                
                 updateModeIndicator();
             };
             
@@ -603,7 +609,7 @@
         
         // Set drawing color
         function setColor(color, event) {
-            const clickedBtn = event.target;
+            const clickedBtn = event.currentTarget || event.target.closest('.color-btn');
             const wasActive = clickedBtn.classList.contains('active');
             
             // 同じボタンをクリックした場合はトグル
