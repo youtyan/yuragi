@@ -76,6 +76,10 @@
             background-color: #4CAF50;
             color: white;
         }
+        .smooth-btn {
+            background-color: #2196F3;
+            color: white;
+        }
         @media (max-width: 480px) {
             body {
                 padding: 5px;
@@ -102,6 +106,7 @@
             <button class="color-btn black-btn active" onclick="setColor('#333333')"></button>
             <button class="color-btn pink-btn" onclick="setColor('#ff6b9d')"></button>
             <button class="clear-btn" onclick="clearCanvas()">クリア</button>
+            <button class="smooth-btn" onclick="smoothLines()">線を補正</button>
             <button class="save-btn" onclick="saveCanvas()">画像を保存</button>
         </div>
     </div>
@@ -115,6 +120,9 @@
         let lastX = 0;
         let lastY = 0;
         let scale = 1;
+        let points = [];  // 描画ポイントを保存
+        const minDistance = 3;  // 最小移動距離（手ブレ補正）
+        let allStrokes = [];  // すべてのストロークを保存
         
         // Drawing area boundaries (relative to image size)
         const drawingAreaRatio = {
@@ -180,6 +188,7 @@
         // Clear canvas
         function clearCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            allStrokes = [];
         }
 
         // Save canvas as image
@@ -249,6 +258,42 @@
                 y: e.clientY - rect.top
             };
         }
+        
+        // Calculate distance between two points
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        }
+        
+        // Draw smooth line through points
+        function drawSmoothLine() {
+            if (points.length < 2) return;
+            
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Clear and redraw the entire line
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            
+            if (points.length === 2) {
+                ctx.lineTo(points[1].x, points[1].y);
+            } else {
+                // Use quadratic curves for smooth lines
+                for (let i = 1; i < points.length - 1; i++) {
+                    const cp = points[i];
+                    const np = points[i + 1];
+                    const midX = (cp.x + np.x) / 2;
+                    const midY = (cp.y + np.y) / 2;
+                    ctx.quadraticCurveTo(cp.x, cp.y, midX, midY);
+                }
+                // Draw the last segment
+                ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+            }
+            
+            ctx.stroke();
+        }
 
         // Drawing functions
         canvas.addEventListener('mousedown', (e) => {
@@ -258,6 +303,7 @@
                 isDrawing = true;
                 lastX = coords.x;
                 lastY = coords.y;
+                points = [{x: coords.x, y: coords.y}];  // 新しい線を開始
             }
         });
 
@@ -267,26 +313,77 @@
             const coords = getCoordinates(e);
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
             
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            // 最小距離チェック（手ブレ補正）
+            const lastPoint = points[points.length - 1];
+            if (getDistance(lastPoint, clampedCoords) < minDistance) {
+                return;
+            }
             
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(clampedCoords.x, clampedCoords.y);
-            ctx.stroke();
+            // 新しいポイントを追加
+            points.push(clampedCoords);
+            
+            // 直近の数ポイントのみを使用して描画（パフォーマンス向上）
+            if (points.length > 2) {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                const startIdx = Math.max(0, points.length - 3);
+                ctx.moveTo(points[startIdx].x, points[startIdx].y);
+                
+                for (let i = startIdx + 1; i < points.length; i++) {
+                    const cp = points[i - 1];
+                    const np = points[i];
+                    const midX = (cp.x + np.x) / 2;
+                    const midY = (cp.y + np.y) / 2;
+                    ctx.quadraticCurveTo(cp.x, cp.y, midX, midY);
+                }
+                
+                ctx.stroke();
+            } else {
+                // 最初の線分は直線で描画
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(clampedCoords.x, clampedCoords.y);
+                ctx.stroke();
+            }
             
             lastX = clampedCoords.x;
             lastY = clampedCoords.y;
         });
 
         canvas.addEventListener('mouseup', () => {
+            if (isDrawing && points.length > 1) {
+                // 最終的な滑らかな線を描画
+                drawSmoothLine();
+                // ストロークを保存
+                allStrokes.push({
+                    points: [...points],
+                    color: currentColor
+                });
+            }
             isDrawing = false;
+            points = [];
         });
 
         canvas.addEventListener('mouseleave', () => {
+            if (isDrawing && points.length > 1) {
+                drawSmoothLine();
+                // ストロークを保存
+                allStrokes.push({
+                    points: [...points],
+                    color: currentColor
+                });
+            }
             isDrawing = false;
+            points = [];
         });
 
         // Touch support for mobile devices
@@ -303,6 +400,7 @@
                 lastX = coords.x;
                 lastY = coords.y;
                 isDrawing = true;
+                points = [{x: coords.x, y: coords.y}];
             }
         });
 
@@ -319,23 +417,271 @@
             
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
             
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            // 最小距離チェック（手ブレ補正）
+            const lastPoint = points[points.length - 1];
+            if (getDistance(lastPoint, clampedCoords) < minDistance) {
+                return;
+            }
             
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(clampedCoords.x, clampedCoords.y);
-            ctx.stroke();
+            // 新しいポイントを追加
+            points.push(clampedCoords);
+            
+            // 直近の数ポイントのみを使用して描画
+            if (points.length > 2) {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                const startIdx = Math.max(0, points.length - 3);
+                ctx.moveTo(points[startIdx].x, points[startIdx].y);
+                
+                for (let i = startIdx + 1; i < points.length; i++) {
+                    const cp = points[i - 1];
+                    const np = points[i];
+                    const midX = (cp.x + np.x) / 2;
+                    const midY = (cp.y + np.y) / 2;
+                    ctx.quadraticCurveTo(cp.x, cp.y, midX, midY);
+                }
+                
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(clampedCoords.x, clampedCoords.y);
+                ctx.stroke();
+            }
             
             lastX = clampedCoords.x;
             lastY = clampedCoords.y;
         });
 
         canvas.addEventListener('touchend', () => {
+            if (isDrawing && points.length > 1) {
+                drawSmoothLine();
+                // ストロークを保存
+                allStrokes.push({
+                    points: [...points],
+                    color: currentColor
+                });
+            }
             isDrawing = false;
+            points = [];
         });
+        
+        // 線を補正する関数
+        function smoothLines() {
+            if (allStrokes.length === 0) return;
+            
+            // キャンバスをクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 各ストロークを補正して再描画
+            allStrokes = allStrokes.map(stroke => {
+                const smoothedPoints = smoothStroke(stroke.points);
+                return {
+                    points: smoothedPoints,
+                    color: stroke.color
+                };
+            });
+            
+            // すべてのストロークを再描画
+            redrawAllStrokes();
+        }
+        
+        // ストロークを補正する関数
+        function smoothStroke(originalPoints) {
+            if (originalPoints.length < 5) return originalPoints;
+            
+            // 1. 時系列として整理（Y座標が単調増加になるように）
+            const timeOrdered = enforceTimelineConstraints(originalPoints);
+            
+            // 2. ダグラス・ペッカーアルゴリズムで重要なポイントを抽出
+            const simplified = douglasPeucker(timeOrdered, 3.0);
+            
+            // 3. カーディナルスプラインで滑らかに補間
+            return generateCardinalSpline(simplified, 0.5, 10);
+        }
+        
+        // 時系列制約を適用（Y座標が単調増加、同じY座標での往復を防ぐ）
+        function enforceTimelineConstraints(points) {
+            if (points.length < 2) return points;
+            
+            const result = [points[0]];
+            let lastValidY = points[0].y;
+            
+            // Y座標でグループ化
+            const yGroups = {};
+            for (const point of points) {
+                const yKey = Math.round(point.y);
+                if (!yGroups[yKey]) {
+                    yGroups[yKey] = [];
+                }
+                yGroups[yKey].push(point);
+            }
+            
+            // 各Y座標グループで代表点を選択
+            const sortedYs = Object.keys(yGroups).map(Number).sort((a, b) => a - b);
+            
+            for (const y of sortedYs) {
+                const group = yGroups[y];
+                if (group.length === 1) {
+                    result.push(group[0]);
+                } else {
+                    // 複数のポイントがある場合は平均値を使用
+                    const avgX = group.reduce((sum, p) => sum + p.x, 0) / group.length;
+                    result.push({ x: avgX, y: y });
+                }
+            }
+            
+            return result;
+        }
+        
+        // ダグラス・ペッカーアルゴリズム
+        function douglasPeucker(points, epsilon) {
+            if (points.length <= 2) return points;
+            
+            // 最も遠い点を見つける
+            let maxDist = 0;
+            let maxIndex = 0;
+            const start = points[0];
+            const end = points[points.length - 1];
+            
+            for (let i = 1; i < points.length - 1; i++) {
+                const dist = perpendicularDistance(points[i], start, end);
+                if (dist > maxDist) {
+                    maxDist = dist;
+                    maxIndex = i;
+                }
+            }
+            
+            // 閾値より大きい場合は分割して再帰
+            if (maxDist > epsilon) {
+                const left = douglasPeucker(points.slice(0, maxIndex + 1), epsilon);
+                const right = douglasPeucker(points.slice(maxIndex), epsilon);
+                return left.slice(0, -1).concat(right);
+            } else {
+                return [start, end];
+            }
+        }
+        
+        // 点から線分への垂直距離
+        function perpendicularDistance(point, lineStart, lineEnd) {
+            const dx = lineEnd.x - lineStart.x;
+            const dy = lineEnd.y - lineStart.y;
+            
+            if (dx === 0 && dy === 0) {
+                return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + 
+                               Math.pow(point.y - lineStart.y, 2));
+            }
+            
+            const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / 
+                     (dx * dx + dy * dy);
+            
+            const closestPoint = {
+                x: lineStart.x + t * dx,
+                y: lineStart.y + t * dy
+            };
+            
+            return Math.sqrt(Math.pow(point.x - closestPoint.x, 2) + 
+                           Math.pow(point.y - closestPoint.y, 2));
+        }
+        
+        // カーディナルスプライン補間（時系列制約付き）
+        function generateCardinalSpline(points, tension, numSegments) {
+            if (points.length < 2) return points;
+            
+            const result = [];
+            
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = i > 0 ? points[i - 1] : points[i];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1];
+                
+                // 垂直・水平の動きを検出して補正強度を調整
+                const isVertical = Math.abs(p2.x - p1.x) < 20;
+                const isHorizontal = Math.abs(p2.y - p1.y) < 20;
+                
+                const adjustedTension = isVertical ? 0.1 : (isHorizontal ? 0.8 : tension);
+                
+                for (let t = 0; t < numSegments; t++) {
+                    const tNorm = t / numSegments;
+                    const point = cardinalSplinePoint(p0, p1, p2, p3, tNorm, adjustedTension);
+                    
+                    // Y座標が逆行しないように制約
+                    if (result.length > 0) {
+                        point.y = Math.max(point.y, result[result.length - 1].y);
+                    }
+                    
+                    result.push(point);
+                }
+            }
+            
+            // 最後の点を追加
+            result.push(points[points.length - 1]);
+            
+            return result;
+        }
+        
+        // カーディナルスプラインの1点を計算
+        function cardinalSplinePoint(p0, p1, p2, p3, t, tension) {
+            const t2 = t * t;
+            const t3 = t2 * t;
+            
+            const v0 = (p2.x - p0.x) * tension;
+            const v1 = (p3.x - p1.x) * tension;
+            
+            const x = p1.x + v0 * t + (3 * (p2.x - p1.x) - 2 * v0 - v1) * t2 + 
+                     (2 * (p1.x - p2.x) + v0 + v1) * t3;
+            
+            const v0y = (p2.y - p0.y) * tension;
+            const v1y = (p3.y - p1.y) * tension;
+            
+            const y = p1.y + v0y * t + (3 * (p2.y - p1.y) - 2 * v0y - v1y) * t2 + 
+                     (2 * (p1.y - p2.y) + v0y + v1y) * t3;
+            
+            return { x, y };
+        }
+        
+        // すべてのストロークを再描画
+        function redrawAllStrokes() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            allStrokes.forEach(stroke => {
+                if (stroke.points.length < 2) return;
+                
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                
+                if (stroke.points.length === 2) {
+                    ctx.lineTo(stroke.points[1].x, stroke.points[1].y);
+                } else {
+                    for (let i = 1; i < stroke.points.length - 1; i++) {
+                        const cp = stroke.points[i];
+                        const np = stroke.points[i + 1];
+                        const midX = (cp.x + np.x) / 2;
+                        const midY = (cp.y + np.y) / 2;
+                        ctx.quadraticCurveTo(cp.x, cp.y, midX, midY);
+                    }
+                    ctx.lineTo(stroke.points[stroke.points.length - 1].x, 
+                              stroke.points[stroke.points.length - 1].y);
+                }
+                
+                ctx.stroke();
+            });
+        }
     </script>
 </body>
 </html>
