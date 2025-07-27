@@ -826,6 +826,10 @@
                     lastY = coords.y;
                     points = [{x: coords.x, y: coords.y}];  // 新しい線を開始
                 }
+            } else if (drawingEnabled && currentColor) {
+                // 描画エリア外でも描画モードの場合はドラッグ状態を有効に
+                isDrawing = true;
+                points = [];  // 空の配列で開始
             }
         });
 
@@ -833,7 +837,19 @@
             if (!isDrawing) return;
             
             const coords = getCoordinates(e);
+            
+            // 描画エリア内に入ったかチェック
+            if (!isInDrawingArea(coords.x, coords.y)) return;
+            
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
+            
+            // まだポイントがない場合は最初のポイントを追加
+            if (points.length === 0) {
+                lastX = clampedCoords.x;
+                lastY = clampedCoords.y;
+                points.push(clampedCoords);
+                return;
+            }
             
             // 最小距離チェック（手ブレ補正）
             const lastPoint = points[points.length - 1];
@@ -933,6 +949,10 @@
                     isDrawing = true;
                     points = [{x: coords.x, y: coords.y}];
                 }
+            } else if (drawingEnabled && currentColor) {
+                // 描画エリア外でも描画モードの場合はドラッグ状態を有効に
+                isDrawing = true;
+                points = [];  // 空の配列で開始
             }
         });
 
@@ -947,9 +967,20 @@
                 y: touch.clientY - rect.top
             };
             
+            // 描画エリア内に入ったかチェック
+            if (!isInDrawingArea(coords.x, coords.y)) return;
+            
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
             
-            // 最小距離チェック（手ブレ補正）
+            // まだポイントがない場合は最初のポイントを追加
+            if (points.length === 0) {
+                lastX = clampedCoords.x;
+                lastY = clampedCoords.y;
+                points.push(clampedCoords);
+                return;
+            }
+            
+            // 最小距離チェック（手ブレ裍正）
             const lastPoint = points[points.length - 1];
             if (getDistance(lastPoint, clampedCoords) < minDistance) {
                 return;
