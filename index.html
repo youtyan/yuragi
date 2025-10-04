@@ -1004,9 +1004,17 @@
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!isDrawing) return;
-            
+
             const touch = e.touches[0];
+
+            // 消しゴムカーソルの位置を更新
+            if (eraseMode) {
+                eraserCursor.style.left = touch.clientX + 'px';
+                eraserCursor.style.top = touch.clientY + 'px';
+            }
+
+            if (!isDrawing) return;
+
             const rect = canvas.getBoundingClientRect();
             const coords = {
                 x: touch.clientX - rect.left,
