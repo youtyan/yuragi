@@ -54,7 +54,20 @@
             cursor: pointer;
         }
         #drawingCanvas.erase-mode {
-            cursor: not-allowed;
+            cursor: none;
+        }
+
+        /* 消しゴムカーソル */
+        .eraser-cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f44336;
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
         }
         .controls {
             margin-top: 20px;
@@ -355,6 +368,7 @@
     <div class="main-container">
         <div class="canvas-container">
             <canvas id="drawingCanvas"></canvas>
+            <div class="eraser-cursor" id="eraserCursor"></div>
             <div class="help-text" id="helpText"></div>
 
         </div>
@@ -413,6 +427,7 @@
     <script>
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
+        const eraserCursor = document.getElementById('eraserCursor');
         let backgroundImage = new Image();
         let imageLoaded = false;
         let isDrawing = false;
@@ -428,6 +443,7 @@
         let selectMode = false;  // 選択モード
         let selectedStrokes = [];  // 選択された線のインデックス
         let currentCanvasWidth = 0;  // 現在のキャンバス幅を記録
+        let erasePoints = [];  // 消しゴムの軌跡
         
         // Drawing area boundaries (relative to image size)
         const drawingAreaRatio = {
@@ -623,6 +639,7 @@
                 document.querySelector('.select-btn').classList.remove('active');
                 canvas.classList.remove('erase-mode');
                 canvas.classList.remove('select-mode');
+                eraserCursor.style.display = 'none';  // 消しゴムカーソルを非表示
                 currentColor = color;
                 
                 // すべての色ボタンを非アクティブにしてから、クリックしたボタンをアクティブに
@@ -657,6 +674,7 @@
                 eraseBtn.classList.remove('active');
                 canvas.classList.add('select-mode');
                 canvas.classList.remove('erase-mode');
+                eraserCursor.style.display = 'none';  // 消しゴムカーソルを非表示
                 // 色ボタンを無効化
                 document.querySelectorAll('.color-btn').forEach(btn => {
                     btn.classList.remove('active');
@@ -684,6 +702,7 @@
                 canvas.classList.add('erase-mode');
                 canvas.classList.remove('select-mode');
                 selectedStrokes = [];  // 選択をクリア
+                eraserCursor.style.display = 'block';  // 消しゴムカーソルを表示
                 drawBackground();
                 // 色ボタンを無効化
                 document.querySelectorAll('.color-btn').forEach(btn => {
@@ -692,6 +711,7 @@
             } else {
                 eraseBtn.classList.remove('active');
                 canvas.classList.remove('erase-mode');
+                eraserCursor.style.display = 'none';  // 消しゴムカーソルを非表示
             }
             updateModeIndicator();
         }
@@ -817,8 +837,9 @@
                     // 選択モード: クリックした位置の線を選択/選択解除
                     selectStroke(coords.x, coords.y);
                 } else if (eraseMode) {
-                    // 消しゴムモード: クリックした位置の線を削除
-                    eraseStroke(coords.x, coords.y);
+                    // 消しゴムモード: ドラッグを開始
+                    isDrawing = true;
+                    erasePoints = [{x: coords.x, y: coords.y}];
                 } else if (drawingEnabled && currentColor) {
                     // 描画が有効かつ色が選択されている場合のみ線を開始
                     isDrawing = true;
@@ -834,15 +855,34 @@
         });
 
         canvas.addEventListener('mousemove', (e) => {
+            // 消しゴムカーソルの位置を更新
+            if (eraseMode) {
+                const rect = canvas.getBoundingClientRect();
+                eraserCursor.style.left = e.clientX + 'px';
+                eraserCursor.style.top = e.clientY + 'px';
+            }
+
             if (!isDrawing) return;
-            
+
             const coords = getCoordinates(e);
-            
+
             // 描画エリア内に入ったかチェック
             if (!isInDrawingArea(coords.x, coords.y)) return;
-            
+
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
-            
+
+            // 消しゴムモードの場合
+            if (eraseMode) {
+                erasePoints.push(clampedCoords);
+
+                // リアルタイムで消しゴム処理を実行
+                if (erasePoints.length > 1) {
+                    const erasePath = [erasePoints[erasePoints.length - 2], clampedCoords];
+                    eraseStrokesByPath(erasePath);
+                }
+                return;
+            }
+
             // まだポイントがない場合は最初のポイントを追加
             if (points.length === 0) {
                 lastX = clampedCoords.x;
@@ -850,7 +890,7 @@
                 points.push(clampedCoords);
                 return;
             }
-            
+
             // 最小距離チェック（手ブレ補正）
             const lastPoint = points[points.length - 1];
             if (getDistance(lastPoint, clampedCoords) < minDistance) {
@@ -898,15 +938,20 @@
         });
 
         canvas.addEventListener('mouseup', () => {
-            if (isDrawing && points.length > 1) {
-                // 最終的な滑らかな線を描画
-                drawSmoothLine();
-                // ストロークを保存（下から上への線も正しく処理）
-                const orderedPoints = orderPointsByTime(points);
-                allStrokes.push({
-                    points: orderedPoints,
-                    color: currentColor
-                });
+            if (isDrawing) {
+                if (eraseMode) {
+                    // 消しゴムポイントをクリア
+                    erasePoints = [];
+                } else if (points.length > 1) {
+                    // 最終的な滑らかな線を描画
+                    drawSmoothLine();
+                    // ストロークを保存（下から上への線も正しく処理）
+                    const orderedPoints = orderPointsByTime(points);
+                    allStrokes.push({
+                        points: orderedPoints,
+                        color: currentColor
+                    });
+                }
             }
             isDrawing = false;
             points = [];
@@ -940,8 +985,9 @@
                     // 選択モード: タップした位置の線を選択/選択解除
                     selectStroke(coords.x, coords.y);
                 } else if (eraseMode) {
-                    // 消しゴムモード: タップした位置の線を削除
-                    eraseStroke(coords.x, coords.y);
+                    // 消しゴムモード: ドラッグを開始
+                    isDrawing = true;
+                    erasePoints = [{x: coords.x, y: coords.y}];
                 } else if (drawingEnabled && currentColor) {
                     // 描画が有効かつ色が選択されている場合のみ線を開始
                     lastX = coords.x;
@@ -969,9 +1015,21 @@
             
             // 描画エリア内に入ったかチェック
             if (!isInDrawingArea(coords.x, coords.y)) return;
-            
+
             const clampedCoords = clampToDrawingArea(coords.x, coords.y);
-            
+
+            // 消しゴムモードの場合
+            if (eraseMode) {
+                erasePoints.push(clampedCoords);
+
+                // リアルタイムで消しゴム処理を実行
+                if (erasePoints.length > 1) {
+                    const erasePath = [erasePoints[erasePoints.length - 2], clampedCoords];
+                    eraseStrokesByPath(erasePath);
+                }
+                return;
+            }
+
             // まだポイントがない場合は最初のポイントを追加
             if (points.length === 0) {
                 lastX = clampedCoords.x;
@@ -979,13 +1037,13 @@
                 points.push(clampedCoords);
                 return;
             }
-            
-            // 最小距離チェック（手ブレ裍正）
+
+            // 最小距離チェック（手ブレ補正）
             const lastPoint = points[points.length - 1];
             if (getDistance(lastPoint, clampedCoords) < minDistance) {
                 return;
             }
-            
+
             // 新しいポイントを追加
             points.push(clampedCoords);
             
@@ -1026,14 +1084,19 @@
         });
 
         canvas.addEventListener('touchend', () => {
-            if (isDrawing && points.length > 1) {
-                drawSmoothLine();
-                // ストロークを保存（下から上への線も正しく処理）
-                const orderedPoints = orderPointsByTime(points);
-                allStrokes.push({
-                    points: orderedPoints,
-                    color: currentColor
-                });
+            if (isDrawing) {
+                if (eraseMode) {
+                    // 消しゴムポイントをクリア
+                    erasePoints = [];
+                } else if (points.length > 1) {
+                    drawSmoothLine();
+                    // ストロークを保存（下から上への線も正しく処理）
+                    const orderedPoints = orderPointsByTime(points);
+                    allStrokes.push({
+                        points: orderedPoints,
+                        color: currentColor
+                    });
+                }
             }
             isDrawing = false;
             points = [];
@@ -1318,41 +1381,64 @@
             return Math.sqrt(Math.pow(px - nearestX, 2) + Math.pow(py - nearestY, 2));
         }
         
-        // 線を消す機能
-        function eraseStroke(x, y) {
-            const threshold = 20;  // クリック位置からの距離の閾値（選択と同じに）
-            
-            // クリック位置に最も近い線を探す
-            let minDistance = Infinity;
-            let targetIndex = -1;
-            
-            for (let i = 0; i < allStrokes.length; i++) {
-                const stroke = allStrokes[i];
-                // 線分ごとに最短距離をチェック
-                for (let j = 0; j < stroke.points.length - 1; j++) {
-                    const p1 = stroke.points[j];
-                    const p2 = stroke.points[j + 1];
-                    
-                    // 点から線分への最短距離を計算
-                    const distance = pointToLineDistance(x, y, p1.x, p1.y, p2.x, p2.y);
-                    
-                    if (distance < minDistance && distance < threshold) {
-                        minDistance = distance;
-                        targetIndex = i;
+        // 消しゴムパスと交差する線の部分を削除
+        function eraseStrokesByPath(erasePath) {
+            const eraseThreshold = 10;  // 消しゴムの幅の半径
+            const newStrokes = [];
+
+            for (let strokeIdx = 0; strokeIdx < allStrokes.length; strokeIdx++) {
+                const stroke = allStrokes[strokeIdx];
+                const segments = [];  // 削除されなかった線分を保持
+                let currentSegment = [];
+
+                // 各ポイントをチェック
+                for (let i = 0; i < stroke.points.length; i++) {
+                    const point = stroke.points[i];
+                    let shouldErase = false;
+
+                    // 消しゴムパス上の各線分との距離をチェック
+                    for (let j = 0; j < erasePath.length - 1; j++) {
+                        const ep1 = erasePath[j];
+                        const ep2 = erasePath[j + 1];
+
+                        // ポイントと消しゴム線分の距離を計算
+                        const dist = pointToLineDistance(point.x, point.y, ep1.x, ep1.y, ep2.x, ep2.y);
+
+                        if (dist < eraseThreshold) {
+                            shouldErase = true;
+                            break;
+                        }
+                    }
+
+                    if (shouldErase) {
+                        // このポイントは消す
+                        if (currentSegment.length > 1) {
+                            segments.push([...currentSegment]);
+                        }
+                        currentSegment = [];
+                    } else {
+                        // このポイントは残す
+                        currentSegment.push(point);
                     }
                 }
+
+                // 最後のセグメントを追加
+                if (currentSegment.length > 1) {
+                    segments.push(currentSegment);
+                }
+
+                // 残ったセグメントを新しいストロークとして追加
+                for (const segment of segments) {
+                    newStrokes.push({
+                        points: segment,
+                        color: stroke.color
+                    });
+                }
             }
-            
-            // 見つかった線を削除
-            if (targetIndex !== -1) {
-                // 選択されていた線を削除する場合は選択リストも更新
-                selectedStrokes = selectedStrokes.filter(index => index !== targetIndex);
-                // 削除した線より後のインデックスを調整
-                selectedStrokes = selectedStrokes.map(index => index > targetIndex ? index - 1 : index);
-                
-                allStrokes.splice(targetIndex, 1);
-                drawBackground();
-            }
+
+            allStrokes = newStrokes;
+            selectedStrokes = [];  // 選択をクリア
+            drawBackground();
         }
         
         // すべてのストロークを再描画
